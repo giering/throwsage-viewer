@@ -1,0 +1,87 @@
+{
+  "version": "3.0",
+  "coord_space": "world",
+  "gravity_source": "foot_contact_svd",
+  "throw": "Rob22_OffCenter_20220626",
+  "frame_count": 404,
+  "fps": 29.83333396911621,
+  "vertex_count": 18439,
+  "face_count": 36874,
+  "focal_length": 2202.9072265625,
+  "camera_position": [
+    0.11254331797114994,
+    0.07600370235370521,
+    0.2582593481974426
+  ],
+  "camera_target": [
+    0.943019688129425,
+    -0.44692957401275635,
+    -4.8176798820495605
+  ],
+  "camera_up": [
+    0,
+    1,
+    0
+  ],
+  "ground_y": -1.5641727352142334,
+  "ground_plane_rmse": 0.05684352293610573,
+  "ground_contact_points": 204,
+  "files": {
+    "vertices": "vertices.bin",
+    "faces": "faces.bin",
+    "keypoints": "keypoints.bin",
+    "hammer": "hammer.bin",
+    "fill_type": "fill_type.bin",
+    "support_state": "support_state.bin"
+  },
+  "turn_boundaries": [
+    140
+  ],
+  "turn_labels": [
+    "T0"
+  ],
+  "throw_window": {
+    "start": 140,
+    "release": 241
+  },
+  "anchor_correction": true,
+  "anchor_max_offset_px": [
+    196.02110535948492,
+    62.311515256797435
+  ],
+  "circle": {
+    "center": [
+      0.6828885349583842,
+      -1.5641727352142334,
+      -5.810596980665658
+    ],
+    "radius": 1.0674999952316284,
+    "detected": true
+  },
+  "poles": {
+    "count": 3,
+    "positions": [
+      [
+        2.2242354526272803,
+        -1.5641727352142334,
+        -5.546944515249893
+      ],
+      [
+        2.9279047687518154,
+        -1.5641727352142334,
+        -5.42374188441929
+      ],
+      [
+        2.223918093229272,
+        -1.5641727352142334,
+        -5.546694169925045
+      ]
+    ],
+    "height": 3.0
+  },
+  "pip_thumbnails": {
+    "dir": "frames_thumb",
+    "width": 320,
+    "pattern": "frame_{:05d}.jpg"
+  }
+}

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>ThrowSage Tagger</title>
+  <link rel="stylesheet" href="tagger-style.css">
+</head>
+<body>
+
+  <!-- Loading overlay -->
+  <div id="loading">
+    <div class="spinner"></div>
+    <div class="label">Loading video...</div>
+  </div>
+
+  <!-- Header -->
+  <div id="header">
+    <span class="app-name">ThrowSage Tagger</span>
+    <span class="throw-name" id="throw-name">—</span>
+    <span class="frame-info" id="frame-info">Frame 0 / 0</span>
+    <span class="tag-summary" id="tag-summary">No tags</span>
+  </div>
+
+  <!-- Main display area -->
+  <div id="display-area">
+    <!-- Hidden video element — source of truth for frames -->
+    <video id="video-source" preload="auto" muted playsinline></video>
+    <!-- Canvas renders the current video frame -->
+    <canvas id="frame-canvas"></canvas>
+  </div>
+
+  <!-- Timeline -->
+  <div id="timeline">
+    <div id="timeline-controls">
+      <button id="step-back-btn" class="nav-btn" title="Back 1 frame">&#9664;</button>
+      <button id="play-btn" class="nav-btn" title="Play/Pause">&#9654;</button>
+      <button id="step-fwd-btn" class="nav-btn" title="Forward 1 frame">&#9654;</button>
+      <div id="speed-group">
+        <button class="speed-btn" data-speed="0.25">0.25x</button>
+        <button class="speed-btn" data-speed="0.5">0.5x</button>
+        <button class="speed-btn active" data-speed="1">1x</button>
+        <button class="speed-btn" data-speed="2">2x</button>
+      </div>
+      <div id="scrubber-container">
+        <input type="range" id="scrubber" min="0" max="0" value="0" step="1">
+        <div id="auto-markers"></div>
+        <div id="manual-markers"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tag buttons toolbar -->
+  <div id="tag-toolbar">
+    <div class="tag-row">
+      <button id="tag-t0-btn" class="tag-btn tag-t0">T0</button>
+      <button id="tag-release-btn" class="tag-btn tag-release">Release</button>
+      <button id="tag-turn-btn" class="tag-btn tag-turn">Turn</button>
+      <button id="tag-ss-btn" class="tag-btn tag-ss">SS</button>
+      <button id="tag-ds-btn" class="tag-btn tag-ds">DS</button>
+    </div>
+    <div class="tag-row">
+      <button id="tag-ball-btn" class="tag-btn tag-ball">Ball</button>
+      <button id="tag-deg0-btn" class="tag-btn tag-deg0">0°</button>
+      <button id="tag-undo-btn" class="tag-btn tag-action">Undo</button>
+      <button id="tag-delete-btn" class="tag-btn tag-action">Delete</button>
+      <button id="tag-save-btn" class="tag-btn tag-save">Save</button>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div id="toast-container"></div>
+
+  <script type="module" src="tagger-app.js"></script>
+</body>
+</html>
