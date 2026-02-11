@@ -35,14 +35,22 @@
     "support_state": "support_state.bin"
   },
   "turn_boundaries": [
-    140
+    164,
+    195,
+    218,
+    238,
+    257
   ],
   "turn_labels": [
-    "T0"
+    "T0",
+    "W1",
+    "W2",
+    "W3",
+    "T4"
   ],
   "throw_window": {
-    "start": 140,
-    "release": 241
+    "start": 164,
+    "release": 262
   },
   "anchor_correction": true,
   "anchor_max_offset_px": [
