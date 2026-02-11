@@ -1,0 +1,81 @@
+{
+  "version": "3.0",
+  "coord_space": "world",
+  "gravity_source": "foot_contact_svd",
+  "throw": "Rob22_small",
+  "frame_count": 304,
+  "fps": 29.83333396911621,
+  "vertex_count": 18439,
+  "face_count": 36874,
+  "focal_length": 2202.9072265625,
+  "camera_position": [
+    0.0077270969796664705,
+    0.11413132808272289,
+    0.23363839368069178
+  ],
+  "camera_target": [
+    0.030147483572363853,
+    -0.23321449756622314,
+    -5.254108905792236
+  ],
+  "camera_up": [
+    0,
+    1,
+    0
+  ],
+  "ground_y": -1.3053870105743408,
+  "ground_plane_rmse": 0.05857038497924805,
+  "ground_contact_points": 190,
+  "files": {
+    "vertices": "vertices.bin",
+    "faces": "faces.bin",
+    "keypoints": "keypoints.bin",
+    "hammer": "hammer.bin",
+    "fill_type": "fill_type.bin",
+    "support_state": "support_state.bin"
+  },
+  "turn_boundaries": [
+    119,
+    147,
+    169,
+    188,
+    207
+  ],
+  "turn_labels": [
+    "T0",
+    "T1",
+    "T2",
+    "T3",
+    "T4"
+  ],
+  "throw_window": {
+    "start": 119,
+    "release": 213
+  },
+  "poles": {
+    "count": 3,
+    "positions": [
+      [
+        2.179723501253389,
+        -1.3053870105743408,
+        -6.4713961041916885
+      ],
+      [
+        -1.2139267239563711,
+        -1.3053870105743408,
+        -6.541649622067493
+      ],
+      [
+        2.4443390794414146,
+        -1.3053870105743408,
+        -6.485867410189266
+      ]
+    ],
+    "height": 3.0
+  },
+  "pip_thumbnails": {
+    "dir": "frames_thumb",
+    "width": 320,
+    "pattern": "frame_{:05d}.jpg"
+  }
+}
