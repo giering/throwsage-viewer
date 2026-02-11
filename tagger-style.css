@@ -1,0 +1,503 @@
+/* ThrowSage Tagger — standalone styles (does not affect viewer) */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: #1a1a1a;
+  color: #e0e0e0;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ─── Loading ─────────────────────────────────────────────────────────────── */
+
+#loading {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #1a1a1a;
+  z-index: 100;
+  gap: 16px;
+}
+
+#loading .spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid #333;
+  border-top-color: #4a9eff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+#loading .label {
+  font-size: 14px;
+  color: #888;
+}
+
+#loading.hidden {
+  display: none;
+}
+
+/* ─── Header ──────────────────────────────────────────────────────────────── */
+
+#header {
+  height: 40px;
+  background: rgba(26, 26, 26, 0.95);
+  border-bottom: 1px solid #333;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 12px;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+#header .app-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #4a9eff;
+}
+
+#header .throw-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #aaa;
+}
+
+#header .frame-info {
+  font-size: 12px;
+  color: #888;
+  font-variant-numeric: tabular-nums;
+}
+
+#header .tag-summary {
+  font-size: 11px;
+  color: #666;
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Display Area ────────────────────────────────────────────────────────── */
+
+#display-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #111;
+  position: relative;
+}
+
+#video-source {
+  display: none; /* hidden — only used as frame source */
+}
+
+#frame-canvas {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* ─── Timeline ────────────────────────────────────────────────────────────── */
+
+#timeline {
+  background: rgba(26, 26, 26, 0.95);
+  border-top: 1px solid #333;
+  padding: 6px 12px 4px;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+#timeline-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: #333;
+  color: #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.nav-btn:hover {
+  background: #444;
+}
+
+.nav-btn:active {
+  background: #4a9eff;
+  color: #fff;
+}
+
+#play-btn {
+  background: #4a9eff;
+  color: #fff;
+}
+
+#play-btn:hover {
+  background: #3a8eef;
+}
+
+/* Step forward button mirror */
+#step-fwd-btn {
+  /* already points right via ▶ character */
+}
+
+#step-back-btn {
+  /* ◀ already points left */
+}
+
+#speed-group {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.speed-btn {
+  padding: 2px 6px;
+  font-size: 11px;
+  border: 1px solid #444;
+  background: rgba(40, 40, 40, 0.8);
+  color: #888;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.speed-btn:hover {
+  border-color: #666;
+  color: #ccc;
+}
+
+.speed-btn.active {
+  border-color: #4a9eff;
+  color: #4a9eff;
+}
+
+#scrubber-container {
+  flex: 1;
+  position: relative;
+  height: 32px;
+  display: flex;
+  align-items: center;
+}
+
+#scrubber {
+  width: 100%;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: #333;
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+
+#scrubber::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #4a9eff;
+  cursor: pointer;
+}
+
+#scrubber::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #4a9eff;
+  border: none;
+  cursor: pointer;
+}
+
+/* ─── Auto-detected markers (from pipeline) ───────────────────────────────── */
+
+#auto-markers, #manual-markers {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 32px;
+  pointer-events: none;
+}
+
+.auto-marker {
+  position: absolute;
+  top: -4px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.auto-tick {
+  width: 2px;
+  height: 8px;
+  background: #666;
+}
+
+.auto-label {
+  font-size: 8px;
+  color: #666;
+  margin-top: 1px;
+  white-space: nowrap;
+}
+
+.auto-release .auto-tick {
+  background: #ff6b6b;
+}
+
+.auto-release .auto-label {
+  color: #ff6b6b;
+}
+
+/* ─── Manual markers (user-tagged) ────────────────────────────────────────── */
+
+.manual-marker {
+  position: absolute;
+  top: -6px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.marker-shape {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 8px solid #ccc;
+}
+
+.marker-label {
+  font-size: 8px;
+  font-weight: 700;
+  margin-top: 1px;
+  white-space: nowrap;
+}
+
+/* T0 — gold */
+.mm-t0 .marker-shape { border-top-color: #ffd700; }
+.mm-t0 .marker-label { color: #ffd700; }
+
+/* Release — green */
+.mm-release .marker-shape { border-top-color: #44dd44; }
+.mm-release .marker-label { color: #44dd44; }
+
+/* Turns — cyan */
+.mm-turn .marker-shape { border-top-color: #00ddff; }
+.mm-turn .marker-label { color: #00ddff; }
+
+/* Winds (pre-T0 turns) — magenta/pink */
+.mm-wind .marker-shape { border-top-color: #dd66ff; }
+.mm-wind .marker-label { color: #dd66ff; }
+
+/* SS — lime */
+.mm-ss .marker-shape {
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: none;
+  border-bottom: 7px solid #88ff44;
+  width: 0; height: 0;
+}
+.mm-ss .marker-label { color: #88ff44; }
+
+/* DS — blue */
+.mm-ds .marker-shape {
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: none;
+  border-bottom: 7px solid #4488ff;
+  width: 0; height: 0;
+}
+.mm-ds .marker-label { color: #4488ff; }
+
+/* ─── Tag Toolbar ─────────────────────────────────────────────────────────── */
+
+#tag-toolbar {
+  background: rgba(26, 26, 26, 0.95);
+  border-top: 1px solid #333;
+  padding: 8px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.tag-row {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.tag-btn {
+  min-width: 56px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 2px solid #444;
+  background: #2a2a2a;
+  color: #ccc;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  flex: 1;
+  max-width: 120px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.tag-btn:hover {
+  border-color: #666;
+  background: #333;
+}
+
+.tag-btn:active {
+  transform: scale(0.96);
+}
+
+/* Tag type colors */
+.tag-t0 { border-color: #aa8800; color: #ffd700; }
+.tag-t0:hover { background: rgba(255, 215, 0, 0.1); }
+.tag-t0.tag-active { background: rgba(255, 215, 0, 0.25); border-color: #ffd700; box-shadow: 0 0 8px rgba(255, 215, 0, 0.3); }
+
+.tag-release { border-color: #228822; color: #44dd44; }
+.tag-release:hover { background: rgba(68, 221, 68, 0.1); }
+.tag-release.tag-active { background: rgba(68, 221, 68, 0.25); border-color: #44dd44; box-shadow: 0 0 8px rgba(68, 221, 68, 0.3); }
+
+.tag-turn { border-color: #006688; color: #00ddff; }
+.tag-turn:hover { background: rgba(0, 221, 255, 0.1); }
+.tag-turn.tag-active { background: rgba(0, 221, 255, 0.25); border-color: #00ddff; box-shadow: 0 0 8px rgba(0, 221, 255, 0.3); }
+
+.tag-ss { border-color: #448800; color: #88ff44; }
+.tag-ss:hover { background: rgba(136, 255, 68, 0.1); }
+.tag-ss.tag-active { background: rgba(136, 255, 68, 0.25); border-color: #88ff44; box-shadow: 0 0 8px rgba(136, 255, 68, 0.3); }
+
+.tag-ds { border-color: #224488; color: #4488ff; }
+.tag-ds:hover { background: rgba(68, 136, 255, 0.1); }
+.tag-ds.tag-active { background: rgba(68, 136, 255, 0.25); border-color: #4488ff; box-shadow: 0 0 8px rgba(68, 136, 255, 0.3); }
+
+/* Ball mode button — orange */
+.tag-ball { border-color: #aa6600; color: #ffaa33; }
+.tag-ball:hover { background: rgba(255, 170, 51, 0.1); }
+.tag-ball.tag-active { background: rgba(255, 170, 51, 0.25); border-color: #ffaa33; box-shadow: 0 0 8px rgba(255, 170, 51, 0.3); }
+.tag-ball.ball-mode-on { background: rgba(255, 170, 51, 0.35); border-color: #ffcc66; color: #ffcc66; animation: pulse-ball 1s ease-in-out infinite; }
+
+@keyframes pulse-ball {
+  0%, 100% { box-shadow: 0 0 4px rgba(255, 170, 51, 0.3); }
+  50% { box-shadow: 0 0 14px rgba(255, 170, 51, 0.6); }
+}
+
+/* 0° reference button — magenta */
+.tag-deg0 { border-color: #8833aa; color: #dd66ff; }
+.tag-deg0:hover { background: rgba(221, 102, 255, 0.1); }
+.tag-deg0.tag-active { background: rgba(221, 102, 255, 0.25); border-color: #dd66ff; box-shadow: 0 0 8px rgba(221, 102, 255, 0.3); }
+.tag-deg0.deg0-mode-on { background: rgba(221, 102, 255, 0.35); border-color: #ee88ff; color: #ee88ff; animation: pulse-deg0 1s ease-in-out infinite; }
+
+@keyframes pulse-deg0 {
+  0%, 100% { box-shadow: 0 0 4px rgba(221, 102, 255, 0.3); }
+  50% { box-shadow: 0 0 14px rgba(221, 102, 255, 0.6); }
+}
+
+/* Crosshair cursor for marking modes */
+#frame-canvas.ball-mode,
+#frame-canvas.deg0-mode {
+  cursor: crosshair;
+}
+
+/* Action buttons (undo, delete) */
+.tag-action { border-color: #555; color: #999; }
+.tag-action:hover { background: #333; border-color: #777; }
+
+/* Save button */
+.tag-save { border-color: #228822; color: #44dd44; }
+.tag-save:hover { background: rgba(68, 221, 68, 0.1); }
+.tag-save.dirty { border-color: #ddaa00; color: #ffcc00; animation: pulse-save 1.5s ease-in-out infinite; }
+
+@keyframes pulse-save {
+  0%, 100% { box-shadow: none; }
+  50% { box-shadow: 0 0 10px rgba(255, 204, 0, 0.3); }
+}
+
+/* ─── Toast Notifications ─────────────────────────────────────────────────── */
+
+#toast-container {
+  position: fixed;
+  top: 50px;
+  right: 12px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.toast {
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0;
+  transform: translateX(30px);
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: auto;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.toast-success {
+  background: rgba(68, 221, 68, 0.9);
+  color: #111;
+}
+
+.toast-error {
+  background: rgba(255, 80, 80, 0.9);
+  color: #fff;
+}
+
+.toast-warn {
+  background: rgba(255, 180, 40, 0.9);
+  color: #111;
+}
+
+.toast-info {
+  background: rgba(74, 158, 255, 0.9);
+  color: #fff;
+}

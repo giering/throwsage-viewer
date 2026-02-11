@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ThrowSage Viewer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Loading overlay -->
+  <div id="loading">
+    <div class="spinner"></div>
+    <div class="label">Loading mesh data...</div>
+  </div>
+
+  <!-- Header -->
+  <div id="header">
+    <span class="throw-name" id="throw-name">—</span>
+    <span class="frame-info" id="frame-info">Frame 0 / 0</span>
+    <span class="fps-display" id="fps-display"></span>
+  </div>
+
+  <!-- Three.js canvas -->
+  <div id="canvas-container"></div>
+
+  <!-- Visibility toggles -->
+  <div id="toggles">
+    <button class="toggle-btn active" data-target="mesh">Mesh</button>
+    <button class="toggle-btn active" data-target="hammer">Hammer</button>
+    <button class="toggle-btn active" data-target="ground">Ground</button>
+    <button class="toggle-btn" data-target="planes">Leg Planes</button>
+    <button class="toggle-btn" data-target="backtilt">Back Tilt</button>
+    <button class="toggle-btn" data-target="separation">Separation</button>
+    <button class="toggle-btn active" data-target="circle">Circle</button>
+    <button class="toggle-btn" data-target="poles">Poles</button>
+    <button class="toggle-btn" id="reset-view-btn">View Reset</button>
+  </div>
+
+  <!-- Picture-in-picture video frame -->
+  <div id="pip-container">
+    <img id="pip-frame" alt="Video frame">
+    <div id="pip-label">Frame 0</div>
+  </div>
+
+  <!-- Metric graph overlays -->
+  <div id="metric-graphs">
+    <div id="separation-container">
+      <canvas id="separation-graph" width="360" height="140"></canvas>
+    </div>
+    <div id="backtilt-container">
+      <canvas id="backtilt-graph" width="360" height="140"></canvas>
+    </div>
+    <div id="kneeangle-container">
+      <canvas id="kneeangle-graph" width="360" height="140"></canvas>
+    </div>
+  </div>
+
+  <!-- Color legend -->
+  <div id="color-legend"></div>
+
+  <!-- Timeline -->
+  <div id="timeline">
+    <div id="timeline-controls">
+      <button id="play-btn" title="Play/Pause">&#9654;</button>
+      <div id="speed-group">
+        <button class="speed-btn" data-speed="0.1">0.1x</button>
+        <button class="speed-btn" data-speed="0.25">0.25x</button>
+        <button class="speed-btn" data-speed="0.5">0.5x</button>
+        <button class="speed-btn active" data-speed="1">1x</button>
+        <button class="speed-btn" data-speed="2">2x</button>
+      </div>
+      <div id="scrubber-container">
+        <input type="range" id="scrubber" min="0" max="0" value="0" step="1">
+        <div id="markers"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="viewer.js"></script>
+</body>
+</html>
