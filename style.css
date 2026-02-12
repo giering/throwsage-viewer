@@ -234,6 +234,29 @@ canvas {
   color: #ff6b6b;
 }
 
+/* Hamburger button — hidden on desktop */
+#hamburger-btn {
+  display: none;
+  position: fixed;
+  top: 48px;
+  right: 12px;
+  z-index: 20;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #444;
+  background: rgba(40, 40, 40, 0.9);
+  color: #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  text-align: center;
+}
+
+#hamburger-btn:hover {
+  border-color: #666;
+}
+
 /* Visibility toggles */
 #toggles {
   position: fixed;
@@ -376,14 +399,19 @@ canvas {
   #header .frame-info { font-size: 11px; }
   #header .fps-display { display: none; }
 
+  /* Hamburger visible, toggles hidden by default */
+  #hamburger-btn { display: block; }
   #toggles {
-    top: 42px;
+    top: 94px;
     right: 8px;
     gap: 3px;
+    display: none;
   }
+  #toggles.open { display: flex; }
   .toggle-btn {
-    padding: 3px 8px;
-    font-size: 11px;
+    padding: 6px 12px;
+    font-size: 12px;
+    min-height: 36px;
   }
 
   #metric-graphs { left: 8px; }
@@ -406,17 +434,12 @@ canvas {
   #scrubber::-webkit-slider-thumb { width: 18px; height: 18px; }
   #scrubber::-moz-range-thumb { width: 18px; height: 18px; }
 
-  #color-legend {
-    bottom: 58px;
-    left: 10px;
-    padding: 3px 8px;
-    gap: 8px;
-  }
-  .legend-item { font-size: 10px; }
+  /* Hide color legend on mobile */
+  #color-legend { display: none; }
 }
 
 /* ============================================
-   Responsive: Phone (≤480px)
+   Responsive: Phone portrait (≤480px)
    ============================================ */
 @media (max-width: 480px) {
   #header {
@@ -428,19 +451,26 @@ canvas {
   #header .frame-info { font-size: 10px; }
   #header .fps-display { display: none; }
 
-  #toggles {
+  #hamburger-btn {
     top: 36px;
+    right: 4px;
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+  }
+
+  #toggles {
+    top: 78px;
     right: 4px;
     gap: 2px;
   }
   .toggle-btn {
-    padding: 3px 6px;
-    font-size: 10px;
+    padding: 6px 10px;
+    font-size: 11px;
+    min-height: 34px;
   }
 
-  #metric-graphs {
-    left: 4px;
-  }
+  #metric-graphs { left: 4px; }
   #backtilt-container,
   #separation-container,
   #kneeangle-container {
@@ -479,13 +509,87 @@ canvas {
   #scrubber::-webkit-slider-thumb { width: 22px; height: 22px; }
   #scrubber::-moz-range-thumb { width: 22px; height: 22px; }
 
-  #color-legend {
-    bottom: 52px;
-    left: 6px;
-    padding: 2px 6px;
+  #color-legend { display: none; }
+}
+
+/* ============================================
+   Responsive: Phone landscape (short + wide)
+   ============================================ */
+@media (max-height: 500px) and (orientation: landscape) {
+  #header {
+    height: 28px;
+    padding: 0 8px;
     gap: 6px;
   }
-  .legend-item { font-size: 9px; gap: 3px; }
-  .legend-dot { width: 6px; height: 6px; }
-  .legend-count { font-size: 8px; }
+  #header .throw-name { font-size: 11px; }
+  #header .frame-info { font-size: 10px; }
+  #header .fps-display { display: none; }
+
+  #hamburger-btn {
+    display: block;
+    top: 32px;
+    right: 4px;
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+
+  #toggles {
+    top: 68px;
+    right: 4px;
+    gap: 2px;
+    display: none;
+  }
+  #toggles.open { display: flex; }
+  .toggle-btn {
+    padding: 3px 8px;
+    font-size: 10px;
+    min-height: 28px;
+  }
+
+  /* Metric graphs — small and left-aligned */
+  #metric-graphs { left: 4px; }
+  #backtilt-graph,
+  #separation-graph,
+  #kneeangle-graph {
+    width: 30vw;
+    height: calc(30vw * 140 / 360);
+  }
+  #backtilt-container,
+  #separation-container,
+  #kneeangle-container {
+    border-width: 1px;
+  }
+
+  /* PiP — small, top-left to avoid timeline overlap */
+  #pip-container {
+    width: 18vw;
+    min-width: 100px;
+    bottom: auto;
+    top: 32px;
+    right: auto;
+    left: 4px;
+  }
+  #pip-label { font-size: 8px; padding: 1px 0; }
+
+  /* Compact timeline */
+  #timeline { padding: 3px 8px 6px; }
+  #timeline-controls { gap: 6px; margin-bottom: 2px; }
+  #play-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+  .speed-btn {
+    padding: 2px 4px;
+    font-size: 9px;
+    min-height: 24px;
+  }
+  #scrubber { height: 6px; }
+  #scrubber::-webkit-slider-thumb { width: 20px; height: 20px; }
+  #scrubber::-moz-range-thumb { width: 20px; height: 20px; }
+
+  .turn-marker .label { font-size: 7px; }
+
+  #color-legend { display: none; }
 }

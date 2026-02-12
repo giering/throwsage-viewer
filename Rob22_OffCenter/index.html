@@ -24,16 +24,17 @@
   <!-- Three.js canvas -->
   <div id="canvas-container"></div>
 
+  <!-- Hamburger menu (mobile) -->
+  <button id="hamburger-btn" aria-label="Toggle menu">&#9776;</button>
+
   <!-- Visibility toggles -->
   <div id="toggles">
-    <button class="toggle-btn active" data-target="mesh">Mesh</button>
+    <button class="toggle-btn active" data-target="mesh">Avatar</button>
     <button class="toggle-btn active" data-target="hammer">Hammer</button>
-    <button class="toggle-btn active" data-target="ground">Ground</button>
     <button class="toggle-btn" data-target="planes">Leg Planes</button>
     <button class="toggle-btn" data-target="backtilt">Back Tilt</button>
     <button class="toggle-btn" data-target="separation">Separation</button>
     <button class="toggle-btn active" data-target="circle">Circle</button>
-    <button class="toggle-btn" data-target="poles">Poles</button>
     <button class="toggle-btn" id="reset-view-btn">View Reset</button>
   </div>
 
@@ -68,7 +69,6 @@
         <button class="speed-btn" data-speed="0.25">0.25x</button>
         <button class="speed-btn" data-speed="0.5">0.5x</button>
         <button class="speed-btn active" data-speed="1">1x</button>
-        <button class="speed-btn" data-speed="2">2x</button>
       </div>
       <div id="scrubber-container">
         <input type="range" id="scrubber" min="0" max="0" value="0" step="1">

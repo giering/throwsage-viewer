@@ -22,8 +22,7 @@ let leftLegPlane, rightLegPlane, legPlanesGroup;
 let circleGroup, circleLine;
 let backPlanesGroup, backPlane;
 let circlePositionsData = null;  // Float32Array (T * 3) — per-frame circle center (camera space)
-let poleGroup;
-let polePositionsData = null;  // Float32Array (N * T * 2) — per-frame pole 2D (camera space)
+let poleGroup;  // kept for legacy data compat — no longer rendered
 let groundY = -Infinity;
 
 // Separation metric
@@ -132,11 +131,6 @@ async function loadData() {
   // Load leg alignment (precomputed from analytics) if available
   if (metadata.files.leg_alignment) {
     legAlignmentData = await loadBinary(metadata.files.leg_alignment, 'float32');
-  }
-
-  // Load per-frame pole positions if available
-  if (metadata.files && metadata.files.pole_positions) {
-    polePositionsData = await loadBinary(metadata.files.pole_positions, 'float32');
   }
 
   // Preload PiP thumbnail frames
@@ -1335,6 +1329,19 @@ function initUI() {
     resetView();
   });
 
+  // Hamburger menu toggle
+  const hamburgerBtn = document.getElementById('hamburger-btn');
+  const togglesPanel = document.getElementById('toggles');
+  if (hamburgerBtn && togglesPanel) {
+    hamburgerBtn.addEventListener('click', () => {
+      togglesPanel.classList.toggle('open');
+    });
+    // Close menu when tapping outside (on the 3D canvas)
+    document.getElementById('canvas-container').addEventListener('click', () => {
+      togglesPanel.classList.remove('open');
+    });
+  }
+
   // Turn markers
   createMarkers();
 
@@ -1346,7 +1353,6 @@ function initUI() {
       const visible = btn.classList.contains('active');
       if (target === 'mesh') bodyMesh.visible = visible;
       if (target === 'hammer') hammerSphere.visible = visible;
-      if (target === 'ground') groundGroup.visible = visible;
       if (target === 'planes') {
         legPlanesGroup.visible = visible;
         const kaContainer = document.getElementById('kneeangle-container');
@@ -1370,10 +1376,6 @@ function initUI() {
         if (visible) drawSeparationGraph(currentFrame);
       }
       if (target === 'circle' && circleGroup) circleGroup.visible = visible;
-      if (target === 'poles' && poleGroup) {
-        poleGroup.visible = visible;
-        if (visible) updatePolesFrame(currentFrame);
-      }
     });
   });
 }
@@ -1418,7 +1420,6 @@ function updateFrame(frame) {
   updateBackPlane(frame);
   updateTorsoColors(frame);
   updateCircleFrame(frame);
-  updatePolesFrame(frame);
   updateFrameDisplay(frame);
 
   // Update separation graph if visible
@@ -1511,7 +1512,6 @@ async function main() {
   createBackPlane();
   precomputeSeparation();
   createCircle();
-  createPoles();
 
   // Set initial frame — positionGround first so groundY is available
   positionGround(0);
