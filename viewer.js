@@ -567,17 +567,19 @@ function drawLegCorotationGraph(frame) {
   if (!canvas || !legAlignmentData) return;
   const ctx = canvas.getContext('2d');
   const w = canvas.width, h = canvas.height;
-  ctx.clearRect(0, 0, w, h);
+
+  // White background
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, w, h);
 
   const tw = metadata.throw_window || {};
   const fStart = tw.start || 0;
   const fEnd = tw.release || (legAlignmentData.length - 1);
 
-  const pad = { left: 40, right: 10, top: 20, bottom: 20 };
+  const pad = { left: 40, right: 10, top: 22, bottom: 22 };
   const plotW = w - pad.left - pad.right;
   const plotH = h - pad.top - pad.bottom;
 
-  // Y range: actual min/max with 5% buffer
   let dataMin = Infinity, dataMax = -Infinity;
   for (let i = fStart; i <= fEnd; i++) {
     const v = legAlignmentData[i];
@@ -594,31 +596,24 @@ function drawLegCorotationGraph(frame) {
 
   const inWindow = frame >= fStart && frame <= fEnd;
 
-  const container = document.getElementById('kneeangle-container');
-  if (container) container.style.borderColor = inWindow ? '#44aa66' : '#444';
+  // SS/DS shading (gray for SS, white for DS) + labels
+  drawSSDSShading(ctx, xPx, pad, plotH, fStart, fEnd);
 
-  // SS/DS background shading
-  if (supportStateData) {
-    for (let i = fStart; i <= fEnd; i++) {
-      const x0 = xPx(i - 0.5), x1 = xPx(i + 0.5);
-      ctx.fillStyle = supportStateData[i] === 1
-        ? 'rgba(100, 180, 255, 0.12)'   // SS: light blue
-        : 'rgba(255, 180, 100, 0.12)';  // DS: light orange
-      ctx.fillRect(x0, pad.top, x1 - x0, plotH);
-    }
-  }
-
-  // Reference thresholds (matching analytics plot)
-  ctx.setLineDash([4, 4]);
+  // Reference thresholds
+  ctx.setLineDash([6, 4]);
   ctx.lineWidth = 1;
-  ctx.strokeStyle = 'rgba(255, 165, 0, 0.6)';  // orange at 15°
-  ctx.beginPath(); ctx.moveTo(pad.left, yPx(15)); ctx.lineTo(w - pad.right, yPx(15)); ctx.stroke();
-  ctx.strokeStyle = 'rgba(255, 60, 60, 0.6)';   // red at 30°
-  ctx.beginPath(); ctx.moveTo(pad.left, yPx(30)); ctx.lineTo(w - pad.right, yPx(30)); ctx.stroke();
+  if (yMinVal <= 15 && yMaxVal >= 15) {
+    ctx.strokeStyle = 'rgba(255, 165, 0, 0.7)';
+    ctx.beginPath(); ctx.moveTo(pad.left, yPx(15)); ctx.lineTo(w - pad.right, yPx(15)); ctx.stroke();
+  }
+  if (yMinVal <= 30 && yMaxVal >= 30) {
+    ctx.strokeStyle = 'rgba(220, 50, 50, 0.7)';
+    ctx.beginPath(); ctx.moveTo(pad.left, yPx(30)); ctx.lineTo(w - pad.right, yPx(30)); ctx.stroke();
+  }
   ctx.setLineDash([]);
 
-  // Y-axis labels + grid lines
-  ctx.fillStyle = '#888';
+  // Y-axis labels + light grid
+  ctx.fillStyle = '#444';
   ctx.font = '10px sans-serif';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
@@ -626,14 +621,17 @@ function drawLegCorotationGraph(frame) {
   for (let v = yMinVal; v <= yMaxVal; v += legStep) {
     ctx.fillText(v + '\u00B0', pad.left - 4, yPx(v));
     if (v > yMinVal && v < yMaxVal) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.07)';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+      ctx.lineWidth = 0.5;
       ctx.beginPath(); ctx.moveTo(pad.left, yPx(v)); ctx.lineTo(w - pad.right, yPx(v)); ctx.stroke();
     }
   }
 
+  // Turn boundaries + release
+  drawTurnMarkers(ctx, xPx, pad, plotH, fStart, fEnd);
+
   // Title
-  ctx.fillStyle = '#ccc';
+  ctx.fillStyle = '#222';
   ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
@@ -641,28 +639,25 @@ function drawLegCorotationGraph(frame) {
 
   // Current value
   if (inWindow) {
-    ctx.fillStyle = '#44aa66';
+    ctx.fillStyle = '#228B22';
     ctx.textAlign = 'right';
     ctx.fillText(legAlignmentData[frame].toFixed(1) + '\u00B0', w - pad.right, 3);
   }
 
-  // Turn boundary markers
-  drawTurnMarkers(ctx, xPx, pad, plotH, fStart, fEnd);
-
-  // Plot line — DS bold green, SS faded green (matching analytics style)
+  // Plot line — DS bold green, SS faded gray
   for (let i = fStart + 1; i <= fEnd; i++) {
     const isDS = supportStateData ? (supportStateData[i] === 0) : true;
-    ctx.strokeStyle = isDS ? '#44aa66' : 'rgba(68, 170, 102, 0.3)';
-    ctx.lineWidth = isDS ? 2.0 : 1.0;
+    ctx.strokeStyle = isDS ? '#228B22' : 'rgba(180, 180, 180, 0.7)';
+    ctx.lineWidth = isDS ? 2.5 : 1.0;
     ctx.beginPath();
     ctx.moveTo(xPx(i - 1), yPx(legAlignmentData[i - 1]));
     ctx.lineTo(xPx(i), yPx(legAlignmentData[i]));
     ctx.stroke();
   }
 
-  // Cursor line
+  // Cursor line — dark for visibility on white
   if (inWindow) {
-    ctx.strokeStyle = '#ffffff';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(xPx(frame), pad.top);
@@ -711,10 +706,39 @@ function precomputeBackTilt() {
   }
 }
 
+function drawSSDSShading(ctx, xPx, pad, plotH, fStart, fEnd) {
+  if (!supportStateData) return;
+  // Draw contiguous SS regions as gray shading (DS = white, SS = gray)
+  let regionStart = fStart;
+  let regionState = supportStateData[fStart];
+  for (let i = fStart + 1; i <= fEnd + 1; i++) {
+    const s = i <= fEnd ? supportStateData[i] : -1;
+    if (s !== regionState || i > fEnd) {
+      const x0 = xPx(regionStart - 0.5);
+      const x1 = xPx(i - 0.5);
+      if (regionState === 1) {
+        // SS: light gray shading
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.07)';
+        ctx.fillRect(x0, pad.top, x1 - x0, plotH);
+      }
+      // Label at bottom of region
+      const midX = (x0 + x1) / 2;
+      const label = regionState === 1 ? 'SS' : 'DS';
+      ctx.fillStyle = '#999';
+      ctx.font = 'bold 8px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(label, midX, pad.top + plotH - 1);
+      regionStart = i;
+      regionState = s;
+    }
+  }
+}
+
 function drawTurnMarkers(ctx, xPx, pad, plotH, fStart, fEnd) {
   if (!metadata.turn_boundaries) return;
   ctx.save();
-  ctx.setLineDash([2, 3]);
+  ctx.setLineDash([4, 4]);
   ctx.lineWidth = 1;
   ctx.font = '9px sans-serif';
   ctx.textAlign = 'center';
@@ -722,29 +746,32 @@ function drawTurnMarkers(ctx, xPx, pad, plotH, fStart, fEnd) {
   metadata.turn_boundaries.forEach((f, i) => {
     if (f < fStart || f > fEnd) return;
     const x = xPx(f);
-    ctx.strokeStyle = '#666';
+    ctx.strokeStyle = 'rgba(100, 150, 200, 0.5)';
     ctx.beginPath();
     ctx.moveTo(x, pad.top);
     ctx.lineTo(x, pad.top + plotH);
     ctx.stroke();
     const label = metadata.turn_labels ? metadata.turn_labels[i] : `T${i}`;
-    ctx.fillStyle = '#888';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText(label, x, pad.top + plotH + 12);
+    ctx.fillStyle = '#666';
+    ctx.textBaseline = 'top';
+    ctx.fillText(label, x, pad.top + 2);
   });
 
-  // Release marker
+  // Release marker — blue dashed
   const relFrame = metadata.throw_window && metadata.throw_window.release;
   if (relFrame && relFrame >= fStart && relFrame <= fEnd) {
     const x = xPx(relFrame);
-    ctx.strokeStyle = '#ff6b6b';
+    ctx.setLineDash([6, 3]);
+    ctx.strokeStyle = 'rgba(50, 100, 200, 0.8)';
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(x, pad.top);
     ctx.lineTo(x, pad.top + plotH);
     ctx.stroke();
-    ctx.fillStyle = '#ff6b6b';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText('REL', x, pad.top + plotH + 12);
+    ctx.fillStyle = 'rgba(50, 100, 200, 0.9)';
+    ctx.font = 'bold 9px sans-serif';
+    ctx.textBaseline = 'top';
+    ctx.fillText('REL', x, pad.top + 2);
   }
 
   ctx.restore();
@@ -755,18 +782,19 @@ function drawBackTiltGraph(frame) {
   if (!canvas || !backTiltAngles) return;
   const ctx = canvas.getContext('2d');
   const w = canvas.width, h = canvas.height;
-  ctx.clearRect(0, 0, w, h);
 
-  // Throw window bounds
+  // White background
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, w, h);
+
   const tw = metadata.throw_window || {};
   const fStart = tw.start || 0;
   const fEnd = tw.release || (backTiltAngles.length - 1);
 
-  const pad = { left: 40, right: 10, top: 20, bottom: 20 };
+  const pad = { left: 40, right: 10, top: 22, bottom: 22 };
   const plotW = w - pad.left - pad.right;
   const plotH = h - pad.top - pad.bottom;
 
-  // Find data range within throw window — actual min/max with 5% buffer
   let dataMin = Infinity, dataMax = -Infinity;
   for (let i = fStart; i <= fEnd; i++) {
     const v = backTiltAngles[i];
@@ -781,18 +809,15 @@ function drawBackTiltGraph(frame) {
   function xPx(f) { return pad.left + ((f - fStart) / fRange) * plotW; }
   function yPx(v) { return pad.top + (1 - (v - yMin) / (yMax - yMin)) * plotH; }
 
-  // Current tilt determines border color
   const curTilt = backTiltAngles[frame];
   const inWindow = frame >= fStart && frame <= fEnd;
-  const borderColor = curTilt >= 0 ? '#44cc66' : '#cc4444';
 
-  // Set container border color
-  const container = document.getElementById('backtilt-container');
-  if (container) container.style.borderColor = inWindow ? borderColor : '#444';
+  // SS/DS shading
+  drawSSDSShading(ctx, xPx, pad, plotH, fStart, fEnd);
 
-  // Zero line (only if 0 is within range)
+  // Zero line
   if (yMin <= 0 && yMax >= 0) {
-    ctx.strokeStyle = '#555';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 4]);
     ctx.beginPath();
@@ -802,8 +827,8 @@ function drawBackTiltGraph(frame) {
     ctx.setLineDash([]);
   }
 
-  // Y-axis labels + grid lines
-  ctx.fillStyle = '#888';
+  // Y-axis labels + light grid
+  ctx.fillStyle = '#444';
   ctx.font = '10px sans-serif';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
@@ -811,43 +836,44 @@ function drawBackTiltGraph(frame) {
   for (let v = yMin; v <= yMax; v += btStep) {
     ctx.fillText(v + '\u00B0', pad.left - 4, yPx(v));
     if (v !== 0 && v > yMin && v < yMax) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.07)';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+      ctx.lineWidth = 0.5;
       ctx.beginPath(); ctx.moveTo(pad.left, yPx(v)); ctx.lineTo(w - pad.right, yPx(v)); ctx.stroke();
     }
   }
 
+  // Turn boundaries + release
+  drawTurnMarkers(ctx, xPx, pad, plotH, fStart, fEnd);
+
   // Title
-  ctx.fillStyle = '#ccc';
+  ctx.fillStyle = '#222';
   ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.fillText('Back Tilt', pad.left, 3);
 
-  // Current value (only when in window)
+  // Current value
   if (inWindow) {
-    ctx.fillStyle = borderColor;
+    const valColor = curTilt >= 0 ? '#228B22' : '#cc3333';
+    ctx.fillStyle = valColor;
     ctx.textAlign = 'right';
     ctx.fillText(curTilt.toFixed(1) + '\u00B0', w - pad.right, 3);
   }
 
-  // Turn boundary markers
-  drawTurnMarkers(ctx, xPx, pad, plotH, fStart, fEnd);
-
-  // Plot line within throw window — color segments by sign
-  ctx.lineWidth = 1.5;
+  // Plot line — green for positive (back), red for negative (forward)
+  ctx.lineWidth = 2.0;
   for (let i = fStart + 1; i <= fEnd; i++) {
     const v0 = backTiltAngles[i - 1], v1 = backTiltAngles[i];
-    ctx.strokeStyle = ((v0 + v1) / 2) >= 0 ? '#44cc66' : '#cc4444';
+    ctx.strokeStyle = ((v0 + v1) / 2) >= 0 ? '#228B22' : '#cc3333';
     ctx.beginPath();
     ctx.moveTo(xPx(i - 1), yPx(v0));
     ctx.lineTo(xPx(i), yPx(v1));
     ctx.stroke();
   }
 
-  // Cursor line — only when frame is within throw window
+  // Cursor line
   if (inWindow) {
-    ctx.strokeStyle = '#ffffff';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(xPx(frame), pad.top);
@@ -1023,17 +1049,19 @@ function drawSeparationGraph(frame) {
   if (!canvas || !separationAngles) return;
   const ctx = canvas.getContext('2d');
   const w = canvas.width, h = canvas.height;
-  ctx.clearRect(0, 0, w, h);
+
+  // White background
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, w, h);
 
   const tw = metadata.throw_window || {};
   const fStart = tw.start || 0;
   const fEnd = tw.release || (separationAngles.length - 1);
 
-  const pad = { left: 40, right: 10, top: 20, bottom: 20 };
+  const pad = { left: 40, right: 10, top: 22, bottom: 22 };
   const plotW = w - pad.left - pad.right;
   const plotH = h - pad.top - pad.bottom;
 
-  // Find data range within throw window — actual min/max with 5% buffer
   let dataMin = Infinity, dataMax = -Infinity;
   for (let i = fStart; i <= fEnd; i++) {
     const v = separationAngles[i];
@@ -1050,14 +1078,13 @@ function drawSeparationGraph(frame) {
 
   const curAngle = separationAngles[frame];
   const inWindow = frame >= fStart && frame <= fEnd;
-  const borderColor = curAngle >= 0 ? '#44cc66' : '#cc4444';
 
-  const container = document.getElementById('separation-container');
-  if (container) container.style.borderColor = inWindow ? borderColor : '#444';
+  // SS/DS shading
+  drawSSDSShading(ctx, xPx, pad, plotH, fStart, fEnd);
 
-  // Zero line (only if 0 is within range)
+  // Zero line
   if (yMin <= 0 && yMax >= 0) {
-    ctx.strokeStyle = '#555';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 4]);
     ctx.beginPath();
@@ -1067,8 +1094,8 @@ function drawSeparationGraph(frame) {
     ctx.setLineDash([]);
   }
 
-  // Y-axis labels + grid lines
-  ctx.fillStyle = '#888';
+  // Y-axis labels + light grid
+  ctx.fillStyle = '#444';
   ctx.font = '10px sans-serif';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
@@ -1076,14 +1103,17 @@ function drawSeparationGraph(frame) {
   for (let v = yMin; v <= yMax; v += sepStep) {
     ctx.fillText(v + '\u00B0', pad.left - 4, yPx(v));
     if (v !== 0 && v > yMin && v < yMax) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.07)';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+      ctx.lineWidth = 0.5;
       ctx.beginPath(); ctx.moveTo(pad.left, yPx(v)); ctx.lineTo(w - pad.right, yPx(v)); ctx.stroke();
     }
   }
 
+  // Turn boundaries + release
+  drawTurnMarkers(ctx, xPx, pad, plotH, fStart, fEnd);
+
   // Title
-  ctx.fillStyle = '#ccc';
+  ctx.fillStyle = '#222';
   ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
@@ -1091,28 +1121,24 @@ function drawSeparationGraph(frame) {
 
   // Current value
   if (inWindow) {
-    ctx.fillStyle = borderColor;
+    ctx.fillStyle = '#6A5ACD';
     ctx.textAlign = 'right';
     ctx.fillText(curAngle.toFixed(1) + '\u00B0', w - pad.right, 3);
   }
 
-  // Turn boundary markers
-  drawTurnMarkers(ctx, xPx, pad, plotH, fStart, fEnd);
-
-  // Plot line — color segments by sign
-  ctx.lineWidth = 1.5;
+  // Plot line — purple (matching analytics style)
+  ctx.strokeStyle = '#6A5ACD';
+  ctx.lineWidth = 2.0;
   for (let i = fStart + 1; i <= fEnd; i++) {
-    const v0 = separationAngles[i - 1], v1 = separationAngles[i];
-    ctx.strokeStyle = ((v0 + v1) / 2) >= 0 ? '#44cc66' : '#cc4444';
     ctx.beginPath();
-    ctx.moveTo(xPx(i - 1), yPx(v0));
-    ctx.lineTo(xPx(i), yPx(v1));
+    ctx.moveTo(xPx(i - 1), yPx(separationAngles[i - 1]));
+    ctx.lineTo(xPx(i), yPx(separationAngles[i]));
     ctx.stroke();
   }
 
   // Cursor line
   if (inWindow) {
-    ctx.strokeStyle = '#ffffff';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(xPx(frame), pad.top);

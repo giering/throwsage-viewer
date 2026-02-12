@@ -445,11 +445,12 @@ canvas {
 #backtilt-container,
 #separation-container,
 #kneeangle-container {
-  background: rgba(26, 26, 26, 0.9);
-  border: 2px solid #444;
+  background: #ffffff;
+  border: 1px solid #ccc;
   border-radius: 4px;
   overflow: hidden;
   display: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
 #backtilt-graph,
@@ -549,11 +550,6 @@ canvas {
   #metric-graphs.overlay-mode canvas {
     width: 90vw;
     height: 40vh;
-  }
-  #metric-graphs.overlay-mode #kneeangle-container,
-  #metric-graphs.overlay-mode #backtilt-container,
-  #metric-graphs.overlay-mode #separation-container {
-    background: #1a1a1a;
   }
   #backtilt-graph,
   #separation-graph,
@@ -722,11 +718,6 @@ canvas {
   #metric-graphs.overlay-mode canvas {
     width: 80vw;
     height: 50vh;
-  }
-  #metric-graphs.overlay-mode #kneeangle-container,
-  #metric-graphs.overlay-mode #backtilt-container,
-  #metric-graphs.overlay-mode #separation-container {
-    background: #1a1a1a;
   }
   #backtilt-graph,
   #separation-graph,
