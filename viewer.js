@@ -1335,6 +1335,21 @@ function applyTimelineRange() {
     if (currentFrame > timelineMax) { currentFrame = timelineMax; scrubber.value = currentFrame; updateFrame(currentFrame); }
   }
   rebuildMarkers();
+  positionThrowWindowBar();
+}
+
+function positionThrowWindowBar() {
+  const bar = document.getElementById('throw-window-bar');
+  if (!bar || !metadata || !metadata.throw_window) return;
+  const T = metadata.frame_count;
+  if (T <= 1) return;
+  const tw = metadata.throw_window;
+  const start = tw.start || 0;
+  const release = tw.release || (T - 1);
+  const leftPct = (start / (T - 1)) * 100;
+  const widthPct = ((release - start) / (T - 1)) * 100;
+  bar.style.left = leftPct + '%';
+  bar.style.width = widthPct + '%';
 }
 
 function rebuildMarkers() {
@@ -1376,7 +1391,6 @@ let graphOverlayActive = false;
 
 function showGraphOverlay(containerId, drawFn) {
   const isMobile = window.innerWidth <= 768 || window.innerHeight <= 500;
-  const backdrop = document.getElementById('graph-backdrop');
   const metricGraphs = document.getElementById('metric-graphs');
   const container = document.getElementById(containerId);
   if (!container) return;
@@ -1385,13 +1399,10 @@ function showGraphOverlay(containerId, drawFn) {
   container.style.display = 'block';
 
   if (isMobile) {
-    // Mobile: full-screen overlay with backdrop
-    backdrop.classList.remove('hidden');
-    requestAnimationFrame(() => backdrop.classList.add('visible'));
+    // Mobile: centered overlay, no backdrop, timeline stays interactive
     metricGraphs.classList.add('overlay-mode');
+    // Resize canvas buffer to match CSS display size (one frame delay for layout)
     requestAnimationFrame(() => {
-      metricGraphs.classList.add('visible');
-      // Resize canvas buffer to match CSS display size
       const canvas = container.querySelector('canvas');
       if (canvas) {
         const rect = canvas.getBoundingClientRect();
@@ -1407,18 +1418,11 @@ function showGraphOverlay(containerId, drawFn) {
 }
 
 function dismissGraphOverlay() {
-  const backdrop = document.getElementById('graph-backdrop');
   const metricGraphs = document.getElementById('metric-graphs');
   const kaContainer = document.getElementById('kneeangle-container');
 
   graphOverlayActive = false;
-
-  // Fade out backdrop
-  backdrop.classList.remove('visible');
-  setTimeout(() => backdrop.classList.add('hidden'), 300);
-
-  // Reset overlay mode
-  metricGraphs.classList.remove('visible', 'overlay-mode');
+  metricGraphs.classList.remove('overlay-mode');
 
   // Hide the graph container
   if (kaContainer) kaContainer.style.display = 'none';
@@ -1595,12 +1599,6 @@ function initUI() {
     planesBtn.addEventListener('pointercancel', () => clearTimeout(holdTimer));
     // Prevent default click from firing after pointer events
     planesBtn.addEventListener('click', (e) => e.stopPropagation());
-  }
-
-  // Backdrop dismiss — click/tap dismisses graph overlay
-  const backdrop = document.getElementById('graph-backdrop');
-  if (backdrop) {
-    backdrop.addEventListener('click', dismissGraphOverlay);
   }
 
   // Other visibility toggles (backtilt, separation, circle)

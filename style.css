@@ -205,7 +205,7 @@ canvas {
   backdrop-filter: blur(8px);
   border-top: 1px solid #333;
   padding: 8px 16px 12px;
-  z-index: 10;
+  z-index: 20;
 }
 
 #timeline-controls {
@@ -490,23 +490,15 @@ canvas {
   font-size: 10px;
 }
 
-/* Graph overlay backdrop */
-#graph-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  z-index: 25;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  cursor: pointer;
-}
-
-#graph-backdrop.visible {
-  opacity: 1;
-}
-
-#graph-backdrop.hidden {
-  display: none;
+/* Throw window highlight bar on scrubber */
+#throw-window-bar {
+  position: absolute;
+  height: 6px;
+  background: rgba(74, 158, 255, 0.3);
+  border-radius: 3px;
+  pointer-events: none;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 /* ============================================
@@ -523,7 +515,12 @@ canvas {
   #header .fps-display { display: none; }
 
   /* Hamburger visible, toggles hidden by default */
-  #hamburger-btn { display: block; }
+  #hamburger-btn {
+    display: block;
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+  }
   #toggles {
     top: 94px;
     right: 8px;
@@ -540,17 +537,19 @@ canvas {
   #metric-graphs { left: 8px; }
   #metric-graphs.overlay-mode {
     position: fixed;
-    top: 50%;
+    top: 40%;
     left: 50%;
     transform: translate(-50%, -50%);
-    z-index: 30;
-    opacity: 0;
-    transition: opacity 0.3s ease;
+    z-index: 15;
   }
-  #metric-graphs.overlay-mode.visible { opacity: 1; }
   #metric-graphs.overlay-mode canvas {
     width: 90vw;
     height: 40vh;
+  }
+  #metric-graphs.overlay-mode #kneeangle-container,
+  #metric-graphs.overlay-mode #backtilt-container,
+  #metric-graphs.overlay-mode #separation-container {
+    background: #1a1a1a;
   }
   #backtilt-graph,
   #separation-graph,
@@ -711,17 +710,19 @@ canvas {
   #metric-graphs { left: 4px; }
   #metric-graphs.overlay-mode {
     position: fixed;
-    top: 50%;
+    top: 40%;
     left: 50%;
     transform: translate(-50%, -50%);
-    z-index: 30;
-    opacity: 0;
-    transition: opacity 0.3s ease;
+    z-index: 15;
   }
-  #metric-graphs.overlay-mode.visible { opacity: 1; }
   #metric-graphs.overlay-mode canvas {
     width: 80vw;
-    height: 60vh;
+    height: 50vh;
+  }
+  #metric-graphs.overlay-mode #kneeangle-container,
+  #metric-graphs.overlay-mode #backtilt-container,
+  #metric-graphs.overlay-mode #separation-container {
+    background: #1a1a1a;
   }
   #backtilt-graph,
   #separation-graph,
