@@ -43,9 +43,9 @@
   ],
   "turn_labels": [
     "T0",
-    "W1",
-    "W2",
-    "W3",
+    "T1",
+    "T2",
+    "T3",
     "T4"
   ],
   "throw_window": {
