@@ -657,11 +657,11 @@ canvas {
     min-height: 28px;
   }
 
-  #scrubber { height: 12px; }
-  #scrubber-container { height: 48px; }
-  #markers { height: 48px; }
-  #scrubber::-webkit-slider-thumb { width: 44px; height: 44px; }
-  #scrubber::-moz-range-thumb { width: 44px; height: 44px; }
+  #scrubber { height: 6px; }
+  #scrubber-container { height: 28px; }
+  #markers { height: 28px; }
+  #scrubber::-webkit-slider-thumb { width: 24px; height: 24px; }
+  #scrubber::-moz-range-thumb { width: 24px; height: 24px; }
 
   #color-legend { display: none; }
 
@@ -709,6 +709,20 @@ canvas {
 
   /* Metric graphs — small and left-aligned */
   #metric-graphs { left: 4px; }
+  #metric-graphs.overlay-mode {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 30;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  #metric-graphs.overlay-mode.visible { opacity: 1; }
+  #metric-graphs.overlay-mode canvas {
+    width: 80vw;
+    height: 60vh;
+  }
   #backtilt-graph,
   #separation-graph,
   #kneeangle-graph {

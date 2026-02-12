@@ -1320,12 +1320,6 @@ function resetView() {
 
 function getTimelineRange() {
   const T = metadata.frame_count;
-  if (window.innerWidth > 768) return { min: 0, max: T - 1 };
-  const tw = metadata.throw_window;
-  if (tw && typeof tw.start === 'number' && typeof tw.release === 'number' &&
-      tw.start >= 0 && tw.release > tw.start && tw.release < T) {
-    return { min: tw.start, max: tw.release };
-  }
   return { min: 0, max: T - 1 };
 }
 
@@ -1381,7 +1375,7 @@ function rebuildMarkers() {
 let graphOverlayActive = false;
 
 function showGraphOverlay(containerId, drawFn) {
-  const isMobile = window.innerWidth <= 768;
+  const isMobile = window.innerWidth <= 768 || window.innerHeight <= 500;
   const backdrop = document.getElementById('graph-backdrop');
   const metricGraphs = document.getElementById('metric-graphs');
   const container = document.getElementById(containerId);
@@ -1397,14 +1391,12 @@ function showGraphOverlay(containerId, drawFn) {
     metricGraphs.classList.add('overlay-mode');
     requestAnimationFrame(() => {
       metricGraphs.classList.add('visible');
-      // Resize canvas to match CSS size
+      // Resize canvas buffer to match CSS display size
       const canvas = container.querySelector('canvas');
       if (canvas) {
         const rect = canvas.getBoundingClientRect();
-        canvas.width = rect.width * window.devicePixelRatio;
-        canvas.height = rect.height * window.devicePixelRatio;
-        const ctx = canvas.getContext('2d');
-        ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        canvas.width = Math.round(rect.width);
+        canvas.height = Math.round(rect.height);
       }
       drawFn(currentFrame);
     });
