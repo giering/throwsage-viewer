@@ -34,6 +34,9 @@ let separationEnabled = false;
 // Support state
 let supportStateData = null;   // Int8Array(T) — 1=SS, 0=DS
 
+// Per-vertex colors (from paint_mesh_from_video.py)
+let vertexColorsData = null;   // Float32Array(V * 3) — static RGB per vertex
+
 // PiP preloaded thumbnails
 let pipFrames = null;          // Array of Image objects (preloaded)
 
@@ -182,6 +185,11 @@ async function loadData() {
     legAlignmentData = await loadBinary(metadata.files.leg_alignment, 'float32');
   }
 
+  // Load static vertex colors if available (from paint_mesh_from_video.py)
+  if (metadata.files.vertex_colors) {
+    vertexColorsData = await loadBinary(metadata.files.vertex_colors, 'float32');
+  }
+
   // Preload PiP thumbnail frames
   if (metadata.pip_thumbnails) {
     const thumbDir = metadata.pip_thumbnails.dir;
@@ -304,12 +312,16 @@ function createBodyMesh() {
   posAttr.setUsage(THREE.StreamDrawUsage);
   geometry.setAttribute('position', posAttr);
 
-  // Vertex colors — init to skin tone
+  // Vertex colors — use painted colors if available, else skin tone
   const colorArray = new Float32Array(V * 3);
-  for (let i = 0; i < V; i++) {
-    colorArray[i * 3]     = 0.831;
-    colorArray[i * 3 + 1] = 0.647;
-    colorArray[i * 3 + 2] = 0.455;
+  if (vertexColorsData && vertexColorsData.length === V * 3) {
+    colorArray.set(vertexColorsData);
+  } else {
+    for (let i = 0; i < V; i++) {
+      colorArray[i * 3]     = 0.831;
+      colorArray[i * 3 + 1] = 0.647;
+      colorArray[i * 3 + 2] = 0.455;
+    }
   }
   const colorAttr = new THREE.BufferAttribute(colorArray, 3);
   colorAttr.setUsage(THREE.StreamDrawUsage);
@@ -987,11 +999,15 @@ function updateTorsoColors(frame) {
   const V = metadata.vertex_count;
 
   if (!separationEnabled || !separationAngles) {
-    // Reset all to skin color
-    for (let i = 0; i < V; i++) {
-      arr[i * 3]     = SKIN_R;
-      arr[i * 3 + 1] = SKIN_G;
-      arr[i * 3 + 2] = SKIN_B;
+    // Reset to painted colors or skin tone
+    if (vertexColorsData && vertexColorsData.length === V * 3) {
+      arr.set(vertexColorsData);
+    } else {
+      for (let i = 0; i < V; i++) {
+        arr[i * 3]     = SKIN_R;
+        arr[i * 3 + 1] = SKIN_G;
+        arr[i * 3 + 2] = SKIN_B;
+      }
     }
     colorAttr.needsUpdate = true;
     return;
@@ -1035,6 +1051,10 @@ function updateTorsoColors(frame) {
       arr[i * 3]     = tR;
       arr[i * 3 + 1] = tG;
       arr[i * 3 + 2] = tB;
+    } else if (vertexColorsData && vertexColorsData.length === V * 3) {
+      arr[i * 3]     = vertexColorsData[i * 3];
+      arr[i * 3 + 1] = vertexColorsData[i * 3 + 1];
+      arr[i * 3 + 2] = vertexColorsData[i * 3 + 2];
     } else {
       arr[i * 3]     = SKIN_R;
       arr[i * 3 + 1] = SKIN_G;

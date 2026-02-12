@@ -5,8 +5,8 @@
   "throw": "Rob22_small",
   "frame_count": 304,
   "fps": 29.83333396911621,
-  "vertex_count": 18439,
-  "face_count": 36874,
+  "vertex_count": 9002,
+  "face_count": 18000,
   "focal_length": 2202.9072265625,
   "camera_position": [
     0.0077270969796664705,
@@ -34,6 +34,7 @@
     "fill_type": "fill_type.bin",
     "support_state": "support_state.bin"
   },
+  "has_vertex_colors": false,
   "turn_boundaries": [
     119,
     147,

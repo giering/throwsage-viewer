@@ -5,8 +5,8 @@
   "throw": "SeanCExemplar4T_small",
   "frame_count": 160,
   "fps": 23.97599983215332,
-  "vertex_count": 18439,
-  "face_count": 36874,
+  "vertex_count": 9002,
+  "face_count": 18000,
   "focal_length": 2202.9072265625,
   "camera_position": [
     0.04675878875684102,
@@ -35,6 +35,7 @@
     "support_state": "support_state.bin",
     "leg_alignment": "leg_alignment.bin"
   },
+  "has_vertex_colors": false,
   "turn_boundaries": [
     68,
     85,
