@@ -1359,24 +1359,37 @@ function resetView() {
 
 // ─── Timeline Range (mobile: T0 to Release) ─────────────────────────────────
 
-function getTimelineRange() {
-  const T = metadata.frame_count;
-  let maxFrame = T - 1;
+let lastHammerFrame = 0;  // cached: last non-NaN hammer frame
+let activeRangePreset = 'all';
 
-  // End timeline at last tracked hammer frame (NaN = post peak height)
+function computeLastHammerFrame() {
+  const T = metadata.frame_count;
+  lastHammerFrame = T - 1;
   if (hammerData) {
     for (let f = T - 1; f >= 0; f--) {
       const off = f * 3;
       const isInvalid = isNaN(hammerData[off]) ||
         (hammerData[off] === 0 && hammerData[off + 1] === 0 && hammerData[off + 2] === 0);
       if (!isInvalid) {
-        maxFrame = f;
+        lastHammerFrame = f;
         break;
       }
     }
   }
+}
 
-  return { min: 0, max: maxFrame };
+function getTimelineRange() {
+  const tw = metadata.throw_window || {};
+  const t0 = tw.start || 0;
+
+  if (activeRangePreset === 'wind') {
+    return { min: 0, max: Math.max(t0, 0) };
+  }
+  if (activeRangePreset === 'throw') {
+    return { min: t0, max: lastHammerFrame };
+  }
+  // 'all'
+  return { min: 0, max: lastHammerFrame };
 }
 
 function applyTimelineRange() {
@@ -1535,6 +1548,16 @@ function initUI() {
       document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       playbackSpeed = parseFloat(btn.dataset.speed);
+    });
+  });
+
+  // Range preset buttons
+  document.querySelectorAll('.range-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeRangePreset = btn.dataset.range;
+      applyTimelineRange();
     });
   });
 
@@ -1789,6 +1812,7 @@ async function main() {
     return;
   }
 
+  computeLastHammerFrame();
   initScene();
   createBodyMesh();
   createHammer();

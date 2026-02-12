@@ -261,6 +261,35 @@ canvas {
   color: #4a9eff;
 }
 
+.group-divider {
+  width: 1px;
+  height: 16px;
+  background: #444;
+  margin: 0 4px;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+.range-btn {
+  padding: 2px 6px;
+  font-size: 11px;
+  border: 1px solid #444;
+  background: rgba(40, 40, 40, 0.8);
+  color: #888;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.range-btn:hover {
+  border-color: #666;
+  color: #ccc;
+}
+
+.range-btn.active {
+  border-color: #ff9f43;
+  color: #ff9f43;
+}
+
 #scrubber-container {
   flex: 1;
   position: relative;
@@ -656,11 +685,12 @@ canvas {
   }
 
   #speed-group { gap: 1px; }
-  .speed-btn {
+  .speed-btn, .range-btn {
     padding: 4px 5px;
     font-size: 10px;
     min-height: 28px;
   }
+  .group-divider { height: 14px; margin: 0 3px; }
 
   #scrubber { height: 6px; }
   #scrubber-container { height: 28px; }
@@ -759,11 +789,12 @@ canvas {
     height: 28px;
     font-size: 12px;
   }
-  .speed-btn {
+  .speed-btn, .range-btn {
     padding: 2px 4px;
     font-size: 9px;
     min-height: 24px;
   }
+  .group-divider { height: 12px; margin: 0 2px; }
   #scrubber { height: 8px; }
   #scrubber::-webkit-slider-thumb { width: 32px; height: 32px; }
   #scrubber::-moz-range-thumb { width: 32px; height: 32px; }
