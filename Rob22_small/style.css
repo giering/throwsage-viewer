@@ -362,3 +362,130 @@ canvas {
   color: #666;
   font-size: 10px;
 }
+
+/* ============================================
+   Responsive: Tablet (≤768px)
+   ============================================ */
+@media (max-width: 768px) {
+  #header {
+    height: 36px;
+    padding: 0 10px;
+    gap: 10px;
+  }
+  #header .throw-name { font-size: 12px; }
+  #header .frame-info { font-size: 11px; }
+  #header .fps-display { display: none; }
+
+  #toggles {
+    top: 42px;
+    right: 8px;
+    gap: 3px;
+  }
+  .toggle-btn {
+    padding: 3px 8px;
+    font-size: 11px;
+  }
+
+  #metric-graphs { left: 8px; }
+  #backtilt-graph,
+  #separation-graph,
+  #kneeangle-graph {
+    width: 280px;
+    height: 109px;
+  }
+
+  #pip-container {
+    width: 180px;
+    bottom: 64px;
+    right: 8px;
+  }
+
+  #timeline { padding: 6px 10px 10px; }
+  #timeline-controls { gap: 8px; }
+
+  #scrubber::-webkit-slider-thumb { width: 18px; height: 18px; }
+  #scrubber::-moz-range-thumb { width: 18px; height: 18px; }
+
+  #color-legend {
+    bottom: 58px;
+    left: 10px;
+    padding: 3px 8px;
+    gap: 8px;
+  }
+  .legend-item { font-size: 10px; }
+}
+
+/* ============================================
+   Responsive: Phone (≤480px)
+   ============================================ */
+@media (max-width: 480px) {
+  #header {
+    height: 32px;
+    padding: 0 8px;
+    gap: 6px;
+  }
+  #header .throw-name { font-size: 11px; }
+  #header .frame-info { font-size: 10px; }
+  #header .fps-display { display: none; }
+
+  #toggles {
+    top: 36px;
+    right: 4px;
+    gap: 2px;
+  }
+  .toggle-btn {
+    padding: 3px 6px;
+    font-size: 10px;
+  }
+
+  #metric-graphs {
+    left: 4px;
+  }
+  #backtilt-container,
+  #separation-container,
+  #kneeangle-container {
+    border-width: 1px;
+  }
+  #backtilt-graph,
+  #separation-graph,
+  #kneeangle-graph {
+    width: 52vw;
+    height: calc(52vw * 140 / 360);
+  }
+
+  #pip-container {
+    width: 28vw;
+    bottom: 56px;
+    right: 4px;
+  }
+  #pip-label { font-size: 8px; padding: 1px 0; }
+
+  #timeline { padding: 4px 8px 8px; }
+  #timeline-controls { gap: 6px; margin-bottom: 4px; }
+  #play-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+
+  #speed-group { gap: 1px; }
+  .speed-btn {
+    padding: 4px 5px;
+    font-size: 10px;
+    min-height: 28px;
+  }
+
+  #scrubber { height: 8px; }
+  #scrubber::-webkit-slider-thumb { width: 22px; height: 22px; }
+  #scrubber::-moz-range-thumb { width: 22px; height: 22px; }
+
+  #color-legend {
+    bottom: 52px;
+    left: 6px;
+    padding: 2px 6px;
+    gap: 6px;
+  }
+  .legend-item { font-size: 9px; gap: 3px; }
+  .legend-dot { width: 6px; height: 6px; }
+  .legend-count { font-size: 8px; }
+}
