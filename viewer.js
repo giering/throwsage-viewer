@@ -1361,7 +1361,22 @@ function resetView() {
 
 function getTimelineRange() {
   const T = metadata.frame_count;
-  return { min: 0, max: T - 1 };
+  let maxFrame = T - 1;
+
+  // End timeline at last tracked hammer frame (NaN = post peak height)
+  if (hammerData) {
+    for (let f = T - 1; f >= 0; f--) {
+      const off = f * 3;
+      const isInvalid = isNaN(hammerData[off]) ||
+        (hammerData[off] === 0 && hammerData[off + 1] === 0 && hammerData[off + 2] === 0);
+      if (!isInvalid) {
+        maxFrame = f;
+        break;
+      }
+    }
+  }
+
+  return { min: 0, max: maxFrame };
 }
 
 function applyTimelineRange() {
@@ -1382,13 +1397,13 @@ function applyTimelineRange() {
 function positionThrowWindowBar() {
   const bar = document.getElementById('throw-window-bar');
   if (!bar || !metadata || !metadata.throw_window) return;
-  const T = metadata.frame_count;
-  if (T <= 1) return;
+  const range = timelineMax - timelineMin;
+  if (range <= 0) return;
   const tw = metadata.throw_window;
-  const start = tw.start || 0;
-  const release = tw.release || (T - 1);
-  const leftPct = (start / (T - 1)) * 100;
-  const widthPct = ((release - start) / (T - 1)) * 100;
+  const start = Math.max(tw.start || 0, timelineMin);
+  const release = Math.min(tw.release || timelineMax, timelineMax);
+  const leftPct = ((start - timelineMin) / range) * 100;
+  const widthPct = ((release - start) / range) * 100;
   bar.style.left = leftPct + '%';
   bar.style.width = widthPct + '%';
 }
@@ -1638,11 +1653,17 @@ function initUI() {
     planesBtn.addEventListener('pointerdown', onPointerDown);
     planesBtn.addEventListener('pointerup', onPointerUp);
     planesBtn.addEventListener('pointercancel', () => clearTimeout(holdTimer));
-    // Suppress browser context menu and text selection on long-press
     planesBtn.addEventListener('contextmenu', (e) => e.preventDefault());
     planesBtn.addEventListener('selectstart', (e) => e.preventDefault());
-    // Prevent default click from firing after pointer events
-    planesBtn.addEventListener('click', (e) => e.stopPropagation());
+    planesBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); });
+  }
+
+  // Tap on graph container dismisses overlay
+  const kneeContainer = document.getElementById('kneeangle-container');
+  if (kneeContainer) {
+    kneeContainer.addEventListener('click', () => {
+      if (graphOverlayActive) dismissGraphOverlay();
+    });
   }
 
   // Other visibility toggles (backtilt, separation, circle)
