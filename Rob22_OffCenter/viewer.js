@@ -14,6 +14,8 @@ let currentFrame = 0;
 let playing = false;
 let lastFrameTime = 0;
 let playbackSpeed = 1.0;
+let timelineMin = 0;
+let timelineMax = 0;
 
 // Three.js objects
 let renderer, scene, camera, controls;
@@ -224,7 +226,7 @@ function initScene() {
   const container = document.getElementById('canvas-container');
 
   // Renderer
-  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setClearColor(0x1a1a1a);
@@ -269,6 +271,22 @@ function initScene() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    applyTimelineRange();
+    // Re-size overlay canvas if graph is active
+    if (graphOverlayActive) {
+      const kaContainer = document.getElementById('kneeangle-container');
+      if (kaContainer && kaContainer.style.display !== 'none') {
+        const canvas = kaContainer.querySelector('canvas');
+        if (canvas) {
+          requestAnimationFrame(() => {
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = Math.round(rect.width);
+            canvas.height = Math.round(rect.height);
+            drawLegCorotationGraph(currentFrame);
+          });
+        }
+      }
+    }
   });
 }
 
@@ -532,15 +550,12 @@ function updateOneLegPlane(frame, pl, hipIdx, kneeIdx, ankleIdx) {
 }
 
 function updateLegPlanes(frame) {
-  // Always update graph if visible
+  // Update graph cursor if graph is visible (timeline scrubbing updates the graph)
   const kaContainer = document.getElementById('kneeangle-container');
   if (kaContainer && kaContainer.style.display !== 'none' && legAlignmentData) {
     drawLegCorotationGraph(frame);
   }
-
-  if (!legPlanesGroup || !legPlanesGroup.visible) return;
-  updateOneLegPlane(frame, leftLegPlane,  KP_LEFT_HIP,  KP_LEFT_KNEE,  KP_LEFT_ANKLE);
-  updateOneLegPlane(frame, rightLegPlane, KP_RIGHT_HIP, KP_RIGHT_KNEE, KP_RIGHT_ANKLE);
+  // Plane geometry is NOT updated per frame — planes are static at activation frame
 }
 
 // ─── Leg Co-rotation Graph ──────────────────────────────────────────────────
@@ -552,17 +567,19 @@ function drawLegCorotationGraph(frame) {
   if (!canvas || !legAlignmentData) return;
   const ctx = canvas.getContext('2d');
   const w = canvas.width, h = canvas.height;
-  ctx.clearRect(0, 0, w, h);
+
+  // White background
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, w, h);
 
   const tw = metadata.throw_window || {};
   const fStart = tw.start || 0;
   const fEnd = tw.release || (legAlignmentData.length - 1);
 
-  const pad = { left: 40, right: 10, top: 20, bottom: 20 };
+  const pad = { left: 40, right: 10, top: 22, bottom: 22 };
   const plotW = w - pad.left - pad.right;
   const plotH = h - pad.top - pad.bottom;
 
-  // Y range: actual min/max with 5% buffer
   let dataMin = Infinity, dataMax = -Infinity;
   for (let i = fStart; i <= fEnd; i++) {
     const v = legAlignmentData[i];
@@ -579,31 +596,24 @@ function drawLegCorotationGraph(frame) {
 
   const inWindow = frame >= fStart && frame <= fEnd;
 
-  const container = document.getElementById('kneeangle-container');
-  if (container) container.style.borderColor = inWindow ? '#44aa66' : '#444';
+  // SS/DS shading (gray for SS, white for DS) + labels
+  drawSSDSShading(ctx, xPx, pad, plotH, fStart, fEnd);
 
-  // SS/DS background shading
-  if (supportStateData) {
-    for (let i = fStart; i <= fEnd; i++) {
-      const x0 = xPx(i - 0.5), x1 = xPx(i + 0.5);
-      ctx.fillStyle = supportStateData[i] === 1
-        ? 'rgba(100, 180, 255, 0.12)'   // SS: light blue
-        : 'rgba(255, 180, 100, 0.12)';  // DS: light orange
-      ctx.fillRect(x0, pad.top, x1 - x0, plotH);
-    }
-  }
-
-  // Reference thresholds (matching analytics plot)
-  ctx.setLineDash([4, 4]);
+  // Reference thresholds
+  ctx.setLineDash([6, 4]);
   ctx.lineWidth = 1;
-  ctx.strokeStyle = 'rgba(255, 165, 0, 0.6)';  // orange at 15°
-  ctx.beginPath(); ctx.moveTo(pad.left, yPx(15)); ctx.lineTo(w - pad.right, yPx(15)); ctx.stroke();
-  ctx.strokeStyle = 'rgba(255, 60, 60, 0.6)';   // red at 30°
-  ctx.beginPath(); ctx.moveTo(pad.left, yPx(30)); ctx.lineTo(w - pad.right, yPx(30)); ctx.stroke();
+  if (yMinVal <= 15 && yMaxVal >= 15) {
+    ctx.strokeStyle = 'rgba(255, 165, 0, 0.7)';
+    ctx.beginPath(); ctx.moveTo(pad.left, yPx(15)); ctx.lineTo(w - pad.right, yPx(15)); ctx.stroke();
+  }
+  if (yMinVal <= 30 && yMaxVal >= 30) {
+    ctx.strokeStyle = 'rgba(220, 50, 50, 0.7)';
+    ctx.beginPath(); ctx.moveTo(pad.left, yPx(30)); ctx.lineTo(w - pad.right, yPx(30)); ctx.stroke();
+  }
   ctx.setLineDash([]);
 
-  // Y-axis labels + grid lines
-  ctx.fillStyle = '#888';
+  // Y-axis labels + light grid
+  ctx.fillStyle = '#444';
   ctx.font = '10px sans-serif';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
@@ -611,14 +621,17 @@ function drawLegCorotationGraph(frame) {
   for (let v = yMinVal; v <= yMaxVal; v += legStep) {
     ctx.fillText(v + '\u00B0', pad.left - 4, yPx(v));
     if (v > yMinVal && v < yMaxVal) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.07)';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+      ctx.lineWidth = 0.5;
       ctx.beginPath(); ctx.moveTo(pad.left, yPx(v)); ctx.lineTo(w - pad.right, yPx(v)); ctx.stroke();
     }
   }
 
+  // Turn boundaries + release
+  drawTurnMarkers(ctx, xPx, pad, plotH, fStart, fEnd);
+
   // Title
-  ctx.fillStyle = '#ccc';
+  ctx.fillStyle = '#222';
   ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
@@ -626,28 +639,25 @@ function drawLegCorotationGraph(frame) {
 
   // Current value
   if (inWindow) {
-    ctx.fillStyle = '#44aa66';
+    ctx.fillStyle = '#228B22';
     ctx.textAlign = 'right';
     ctx.fillText(legAlignmentData[frame].toFixed(1) + '\u00B0', w - pad.right, 3);
   }
 
-  // Turn boundary markers
-  drawTurnMarkers(ctx, xPx, pad, plotH, fStart, fEnd);
-
-  // Plot line — DS bold green, SS faded green (matching analytics style)
+  // Plot line — DS bold green, SS faded gray
   for (let i = fStart + 1; i <= fEnd; i++) {
     const isDS = supportStateData ? (supportStateData[i] === 0) : true;
-    ctx.strokeStyle = isDS ? '#44aa66' : 'rgba(68, 170, 102, 0.3)';
-    ctx.lineWidth = isDS ? 2.0 : 1.0;
+    ctx.strokeStyle = isDS ? '#228B22' : 'rgba(180, 180, 180, 0.7)';
+    ctx.lineWidth = isDS ? 2.5 : 1.0;
     ctx.beginPath();
     ctx.moveTo(xPx(i - 1), yPx(legAlignmentData[i - 1]));
     ctx.lineTo(xPx(i), yPx(legAlignmentData[i]));
     ctx.stroke();
   }
 
-  // Cursor line
+  // Cursor line — dark for visibility on white
   if (inWindow) {
-    ctx.strokeStyle = '#ffffff';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(xPx(frame), pad.top);
@@ -696,10 +706,39 @@ function precomputeBackTilt() {
   }
 }
 
+function drawSSDSShading(ctx, xPx, pad, plotH, fStart, fEnd) {
+  if (!supportStateData) return;
+  // Draw contiguous SS regions as gray shading (DS = white, SS = gray)
+  let regionStart = fStart;
+  let regionState = supportStateData[fStart];
+  for (let i = fStart + 1; i <= fEnd + 1; i++) {
+    const s = i <= fEnd ? supportStateData[i] : -1;
+    if (s !== regionState || i > fEnd) {
+      const x0 = xPx(regionStart - 0.5);
+      const x1 = xPx(i - 0.5);
+      if (regionState === 1) {
+        // SS: light gray shading
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.07)';
+        ctx.fillRect(x0, pad.top, x1 - x0, plotH);
+      }
+      // Label at bottom of region
+      const midX = (x0 + x1) / 2;
+      const label = regionState === 1 ? 'SS' : 'DS';
+      ctx.fillStyle = '#999';
+      ctx.font = 'bold 8px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(label, midX, pad.top + plotH - 1);
+      regionStart = i;
+      regionState = s;
+    }
+  }
+}
+
 function drawTurnMarkers(ctx, xPx, pad, plotH, fStart, fEnd) {
   if (!metadata.turn_boundaries) return;
   ctx.save();
-  ctx.setLineDash([2, 3]);
+  ctx.setLineDash([4, 4]);
   ctx.lineWidth = 1;
   ctx.font = '9px sans-serif';
   ctx.textAlign = 'center';
@@ -707,29 +746,32 @@ function drawTurnMarkers(ctx, xPx, pad, plotH, fStart, fEnd) {
   metadata.turn_boundaries.forEach((f, i) => {
     if (f < fStart || f > fEnd) return;
     const x = xPx(f);
-    ctx.strokeStyle = '#666';
+    ctx.strokeStyle = 'rgba(100, 150, 200, 0.5)';
     ctx.beginPath();
     ctx.moveTo(x, pad.top);
     ctx.lineTo(x, pad.top + plotH);
     ctx.stroke();
     const label = metadata.turn_labels ? metadata.turn_labels[i] : `T${i}`;
-    ctx.fillStyle = '#888';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText(label, x, pad.top + plotH + 12);
+    ctx.fillStyle = '#666';
+    ctx.textBaseline = 'top';
+    ctx.fillText(label, x, pad.top + 2);
   });
 
-  // Release marker
+  // Release marker — blue dashed
   const relFrame = metadata.throw_window && metadata.throw_window.release;
   if (relFrame && relFrame >= fStart && relFrame <= fEnd) {
     const x = xPx(relFrame);
-    ctx.strokeStyle = '#ff6b6b';
+    ctx.setLineDash([6, 3]);
+    ctx.strokeStyle = 'rgba(50, 100, 200, 0.8)';
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(x, pad.top);
     ctx.lineTo(x, pad.top + plotH);
     ctx.stroke();
-    ctx.fillStyle = '#ff6b6b';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText('REL', x, pad.top + plotH + 12);
+    ctx.fillStyle = 'rgba(50, 100, 200, 0.9)';
+    ctx.font = 'bold 9px sans-serif';
+    ctx.textBaseline = 'top';
+    ctx.fillText('REL', x, pad.top + 2);
   }
 
   ctx.restore();
@@ -740,18 +782,19 @@ function drawBackTiltGraph(frame) {
   if (!canvas || !backTiltAngles) return;
   const ctx = canvas.getContext('2d');
   const w = canvas.width, h = canvas.height;
-  ctx.clearRect(0, 0, w, h);
 
-  // Throw window bounds
+  // White background
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, w, h);
+
   const tw = metadata.throw_window || {};
   const fStart = tw.start || 0;
   const fEnd = tw.release || (backTiltAngles.length - 1);
 
-  const pad = { left: 40, right: 10, top: 20, bottom: 20 };
+  const pad = { left: 40, right: 10, top: 22, bottom: 22 };
   const plotW = w - pad.left - pad.right;
   const plotH = h - pad.top - pad.bottom;
 
-  // Find data range within throw window — actual min/max with 5% buffer
   let dataMin = Infinity, dataMax = -Infinity;
   for (let i = fStart; i <= fEnd; i++) {
     const v = backTiltAngles[i];
@@ -766,18 +809,15 @@ function drawBackTiltGraph(frame) {
   function xPx(f) { return pad.left + ((f - fStart) / fRange) * plotW; }
   function yPx(v) { return pad.top + (1 - (v - yMin) / (yMax - yMin)) * plotH; }
 
-  // Current tilt determines border color
   const curTilt = backTiltAngles[frame];
   const inWindow = frame >= fStart && frame <= fEnd;
-  const borderColor = curTilt >= 0 ? '#44cc66' : '#cc4444';
 
-  // Set container border color
-  const container = document.getElementById('backtilt-container');
-  if (container) container.style.borderColor = inWindow ? borderColor : '#444';
+  // SS/DS shading
+  drawSSDSShading(ctx, xPx, pad, plotH, fStart, fEnd);
 
-  // Zero line (only if 0 is within range)
+  // Zero line
   if (yMin <= 0 && yMax >= 0) {
-    ctx.strokeStyle = '#555';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 4]);
     ctx.beginPath();
@@ -787,8 +827,8 @@ function drawBackTiltGraph(frame) {
     ctx.setLineDash([]);
   }
 
-  // Y-axis labels + grid lines
-  ctx.fillStyle = '#888';
+  // Y-axis labels + light grid
+  ctx.fillStyle = '#444';
   ctx.font = '10px sans-serif';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
@@ -796,43 +836,44 @@ function drawBackTiltGraph(frame) {
   for (let v = yMin; v <= yMax; v += btStep) {
     ctx.fillText(v + '\u00B0', pad.left - 4, yPx(v));
     if (v !== 0 && v > yMin && v < yMax) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.07)';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+      ctx.lineWidth = 0.5;
       ctx.beginPath(); ctx.moveTo(pad.left, yPx(v)); ctx.lineTo(w - pad.right, yPx(v)); ctx.stroke();
     }
   }
 
+  // Turn boundaries + release
+  drawTurnMarkers(ctx, xPx, pad, plotH, fStart, fEnd);
+
   // Title
-  ctx.fillStyle = '#ccc';
+  ctx.fillStyle = '#222';
   ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.fillText('Back Tilt', pad.left, 3);
 
-  // Current value (only when in window)
+  // Current value
   if (inWindow) {
-    ctx.fillStyle = borderColor;
+    const valColor = curTilt >= 0 ? '#228B22' : '#cc3333';
+    ctx.fillStyle = valColor;
     ctx.textAlign = 'right';
     ctx.fillText(curTilt.toFixed(1) + '\u00B0', w - pad.right, 3);
   }
 
-  // Turn boundary markers
-  drawTurnMarkers(ctx, xPx, pad, plotH, fStart, fEnd);
-
-  // Plot line within throw window — color segments by sign
-  ctx.lineWidth = 1.5;
+  // Plot line — green for positive (back), red for negative (forward)
+  ctx.lineWidth = 2.0;
   for (let i = fStart + 1; i <= fEnd; i++) {
     const v0 = backTiltAngles[i - 1], v1 = backTiltAngles[i];
-    ctx.strokeStyle = ((v0 + v1) / 2) >= 0 ? '#44cc66' : '#cc4444';
+    ctx.strokeStyle = ((v0 + v1) / 2) >= 0 ? '#228B22' : '#cc3333';
     ctx.beginPath();
     ctx.moveTo(xPx(i - 1), yPx(v0));
     ctx.lineTo(xPx(i), yPx(v1));
     ctx.stroke();
   }
 
-  // Cursor line — only when frame is within throw window
+  // Cursor line
   if (inWindow) {
-    ctx.strokeStyle = '#ffffff';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(xPx(frame), pad.top);
@@ -1008,17 +1049,19 @@ function drawSeparationGraph(frame) {
   if (!canvas || !separationAngles) return;
   const ctx = canvas.getContext('2d');
   const w = canvas.width, h = canvas.height;
-  ctx.clearRect(0, 0, w, h);
+
+  // White background
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, w, h);
 
   const tw = metadata.throw_window || {};
   const fStart = tw.start || 0;
   const fEnd = tw.release || (separationAngles.length - 1);
 
-  const pad = { left: 40, right: 10, top: 20, bottom: 20 };
+  const pad = { left: 40, right: 10, top: 22, bottom: 22 };
   const plotW = w - pad.left - pad.right;
   const plotH = h - pad.top - pad.bottom;
 
-  // Find data range within throw window — actual min/max with 5% buffer
   let dataMin = Infinity, dataMax = -Infinity;
   for (let i = fStart; i <= fEnd; i++) {
     const v = separationAngles[i];
@@ -1035,14 +1078,13 @@ function drawSeparationGraph(frame) {
 
   const curAngle = separationAngles[frame];
   const inWindow = frame >= fStart && frame <= fEnd;
-  const borderColor = curAngle >= 0 ? '#44cc66' : '#cc4444';
 
-  const container = document.getElementById('separation-container');
-  if (container) container.style.borderColor = inWindow ? borderColor : '#444';
+  // SS/DS shading
+  drawSSDSShading(ctx, xPx, pad, plotH, fStart, fEnd);
 
-  // Zero line (only if 0 is within range)
+  // Zero line
   if (yMin <= 0 && yMax >= 0) {
-    ctx.strokeStyle = '#555';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 4]);
     ctx.beginPath();
@@ -1052,8 +1094,8 @@ function drawSeparationGraph(frame) {
     ctx.setLineDash([]);
   }
 
-  // Y-axis labels + grid lines
-  ctx.fillStyle = '#888';
+  // Y-axis labels + light grid
+  ctx.fillStyle = '#444';
   ctx.font = '10px sans-serif';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
@@ -1061,14 +1103,17 @@ function drawSeparationGraph(frame) {
   for (let v = yMin; v <= yMax; v += sepStep) {
     ctx.fillText(v + '\u00B0', pad.left - 4, yPx(v));
     if (v !== 0 && v > yMin && v < yMax) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.07)';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+      ctx.lineWidth = 0.5;
       ctx.beginPath(); ctx.moveTo(pad.left, yPx(v)); ctx.lineTo(w - pad.right, yPx(v)); ctx.stroke();
     }
   }
 
+  // Turn boundaries + release
+  drawTurnMarkers(ctx, xPx, pad, plotH, fStart, fEnd);
+
   // Title
-  ctx.fillStyle = '#ccc';
+  ctx.fillStyle = '#222';
   ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
@@ -1076,28 +1121,24 @@ function drawSeparationGraph(frame) {
 
   // Current value
   if (inWindow) {
-    ctx.fillStyle = borderColor;
+    ctx.fillStyle = '#6A5ACD';
     ctx.textAlign = 'right';
     ctx.fillText(curAngle.toFixed(1) + '\u00B0', w - pad.right, 3);
   }
 
-  // Turn boundary markers
-  drawTurnMarkers(ctx, xPx, pad, plotH, fStart, fEnd);
-
-  // Plot line — color segments by sign
-  ctx.lineWidth = 1.5;
+  // Plot line — purple (matching analytics style)
+  ctx.strokeStyle = '#6A5ACD';
+  ctx.lineWidth = 2.0;
   for (let i = fStart + 1; i <= fEnd; i++) {
-    const v0 = separationAngles[i - 1], v1 = separationAngles[i];
-    ctx.strokeStyle = ((v0 + v1) / 2) >= 0 ? '#44cc66' : '#cc4444';
     ctx.beginPath();
-    ctx.moveTo(xPx(i - 1), yPx(v0));
-    ctx.lineTo(xPx(i), yPx(v1));
+    ctx.moveTo(xPx(i - 1), yPx(separationAngles[i - 1]));
+    ctx.lineTo(xPx(i), yPx(separationAngles[i]));
     ctx.stroke();
   }
 
   // Cursor line
   if (inWindow) {
-    ctx.strokeStyle = '#ffffff';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(xPx(frame), pad.top);
@@ -1316,7 +1357,157 @@ function resetView() {
   }
 }
 
+// ─── Timeline Range (mobile: T0 to Release) ─────────────────────────────────
+
+let lastHammerFrame = 0;  // cached: last non-NaN hammer frame
+let activeRangePreset = 'all';
+
+function computeLastHammerFrame() {
+  const T = metadata.frame_count;
+  lastHammerFrame = T - 1;
+  if (hammerData) {
+    for (let f = T - 1; f >= 0; f--) {
+      const off = f * 3;
+      const isInvalid = isNaN(hammerData[off]) ||
+        (hammerData[off] === 0 && hammerData[off + 1] === 0 && hammerData[off + 2] === 0);
+      if (!isInvalid) {
+        lastHammerFrame = f;
+        break;
+      }
+    }
+  }
+}
+
+function getTimelineRange() {
+  const tw = metadata.throw_window || {};
+  const t0 = tw.start || 0;
+
+  if (activeRangePreset === 'wind') {
+    return { min: 0, max: Math.max(t0, 0) };
+  }
+  if (activeRangePreset === 'throw') {
+    return { min: t0, max: lastHammerFrame };
+  }
+  // 'all'
+  return { min: 0, max: lastHammerFrame };
+}
+
+function applyTimelineRange() {
+  const range = getTimelineRange();
+  timelineMin = range.min;
+  timelineMax = range.max;
+  const scrubber = document.getElementById('scrubber');
+  if (scrubber) {
+    scrubber.min = timelineMin;
+    scrubber.max = timelineMax;
+    if (currentFrame < timelineMin) { currentFrame = timelineMin; scrubber.value = currentFrame; updateFrame(currentFrame); }
+    if (currentFrame > timelineMax) { currentFrame = timelineMax; scrubber.value = currentFrame; updateFrame(currentFrame); }
+  }
+  rebuildMarkers();
+  positionThrowWindowBar();
+}
+
+function positionThrowWindowBar() {
+  const bar = document.getElementById('throw-window-bar');
+  if (!bar || !metadata || !metadata.throw_window) return;
+  const range = timelineMax - timelineMin;
+  if (range <= 0) return;
+  const tw = metadata.throw_window;
+  const start = Math.max(tw.start || 0, timelineMin);
+  const release = Math.min(tw.release || timelineMax, timelineMax);
+  const leftPct = ((start - timelineMin) / range) * 100;
+  const widthPct = ((release - start) / range) * 100;
+  bar.style.left = leftPct + '%';
+  bar.style.width = widthPct + '%';
+}
+
+function rebuildMarkers() {
+  const container = document.getElementById('markers');
+  if (!container || !metadata) return;
+  container.innerHTML = '';
+  const range = timelineMax - timelineMin;
+  if (range <= 0) return;
+
+  if (metadata.turn_boundaries) {
+    metadata.turn_boundaries.forEach((frame, i) => {
+      if (frame < timelineMin || frame > timelineMax) return;
+      const pct = ((frame - timelineMin) / range) * 100;
+      const label = metadata.turn_labels ? metadata.turn_labels[i] : `T${i}`;
+      const el = document.createElement('div');
+      el.className = 'turn-marker';
+      el.style.left = pct + '%';
+      el.innerHTML = `<div class="tick"></div><div class="label">${label}</div>`;
+      container.appendChild(el);
+    });
+  }
+
+  const relFrame = metadata.throw_window && metadata.throw_window.release;
+  if (relFrame && relFrame >= timelineMin && relFrame <= timelineMax) {
+    const pct = ((relFrame - timelineMin) / range) * 100;
+    const el = document.createElement('div');
+    el.className = 'turn-marker release';
+    el.style.left = pct + '%';
+    el.innerHTML = `<div class="tick"></div><div class="label">REL</div>`;
+    container.appendChild(el);
+  }
+}
+
 // ─── UI ──────────────────────────────────────────────────────────────────────
+
+// ─── Graph Overlay System ─────────────────────────────────────────────────────
+
+let graphOverlayActive = false;
+
+function showGraphOverlay(containerId, drawFn) {
+  const isMobile = window.innerWidth <= 768 || window.innerHeight <= 500;
+  const metricGraphs = document.getElementById('metric-graphs');
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  graphOverlayActive = true;
+  container.style.display = 'block';
+
+  if (isMobile) {
+    // Mobile: centered overlay, no backdrop, timeline stays interactive
+    metricGraphs.classList.add('overlay-mode');
+    // Resize canvas buffer to match CSS display size (one frame delay for layout)
+    requestAnimationFrame(() => {
+      const canvas = container.querySelector('canvas');
+      if (canvas) {
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = Math.round(rect.width);
+        canvas.height = Math.round(rect.height);
+      }
+      drawFn(currentFrame);
+    });
+  } else {
+    // Desktop: show in normal left-side position
+    drawFn(currentFrame);
+  }
+}
+
+function dismissGraphOverlay() {
+  const metricGraphs = document.getElementById('metric-graphs');
+  const kaContainer = document.getElementById('kneeangle-container');
+
+  graphOverlayActive = false;
+  metricGraphs.classList.remove('overlay-mode');
+
+  // Hide the graph container
+  if (kaContainer) kaContainer.style.display = 'none';
+
+  // Reset canvas size to default
+  const canvas = document.getElementById('kneeangle-graph');
+  if (canvas) {
+    canvas.width = 360;
+    canvas.height = 140;
+  }
+
+  // Also hide leg planes and deactivate button
+  if (legPlanesGroup) legPlanesGroup.visible = false;
+  const planesBtn = document.querySelector('.toggle-btn[data-target="planes"]');
+  if (planesBtn) planesBtn.classList.remove('active');
+}
 
 function cleanThrowName(raw) {
   if (metadata.display_name) return metadata.display_name;
@@ -1360,6 +1551,16 @@ function initUI() {
     });
   });
 
+  // Range preset buttons
+  document.querySelectorAll('.range-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeRangePreset = btn.dataset.range;
+      applyTimelineRange();
+    });
+  });
+
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
     if (e.code === 'Space') {
@@ -1367,16 +1568,16 @@ function initUI() {
       playBtn.click();
     } else if (e.code === 'ArrowLeft') {
       e.preventDefault();
-      setFrame(Math.max(0, currentFrame - 1));
+      setFrame(Math.max(timelineMin, currentFrame - 1));
     } else if (e.code === 'ArrowRight') {
       e.preventDefault();
-      setFrame(Math.min(T - 1, currentFrame + 1));
+      setFrame(Math.min(timelineMax, currentFrame + 1));
     } else if (e.code === 'Home') {
       e.preventDefault();
-      setFrame(0);
+      setFrame(timelineMin);
     } else if (e.code === 'End') {
       e.preventDefault();
-      setFrame(T - 1);
+      setFrame(timelineMax);
     }
   });
 
@@ -1400,6 +1601,19 @@ function initUI() {
     });
   }
 
+  // Screenshot button
+  const ssBtn = document.getElementById('screenshot-btn');
+  if (ssBtn) {
+    ssBtn.addEventListener('click', () => {
+      const dataURL = renderer.domElement.toDataURL('image/png');
+      const link = document.createElement('a');
+      const throwName = (metadata.throw || 'throw').replace(/\s+/g, '_');
+      link.download = `${throwName}_frame${currentFrame}.png`;
+      link.href = dataURL;
+      link.click();
+    });
+  }
+
   // Hamburger menu toggle
   const hamburgerBtn = document.getElementById('hamburger-btn');
   const togglesPanel = document.getElementById('toggles');
@@ -1413,26 +1627,75 @@ function initUI() {
     });
   }
 
-  // Turn markers
-  createMarkers();
+  // Timeline range + turn markers
+  applyTimelineRange();
 
-  // Visibility toggles
-  document.querySelectorAll('.toggle-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      btn.classList.toggle('active');
-      const target = btn.dataset.target;
-      const visible = btn.classList.contains('active');
-      if (target === 'mesh') bodyMesh.visible = visible;
-      if (target === 'hammer') hammerSphere.visible = visible;
-      if (target === 'planes') {
-        legPlanesGroup.visible = visible;
-        const kaContainer = document.getElementById('kneeangle-container');
-        if (kaContainer) kaContainer.style.display = visible ? 'block' : 'none';
-        if (visible) {
-          updateLegPlanes(currentFrame);
-          if (legAlignmentData) drawLegCorotationGraph(currentFrame);
+  // Visibility toggles — Leg Planes uses tap/hold, others use simple click
+  const planesBtn = document.querySelector('.toggle-btn[data-target="planes"]');
+  if (planesBtn) {
+    let holdTimer = null;
+    let isHold = false;
+
+    const onPointerDown = (e) => {
+      e.preventDefault();
+      isHold = false;
+      holdTimer = setTimeout(() => {
+        isHold = true;
+        // Show leg planes at current frame (static)
+        planesBtn.classList.add('active');
+        legPlanesGroup.visible = true;
+        updateOneLegPlane(currentFrame, leftLegPlane, KP_LEFT_HIP, KP_LEFT_KNEE, KP_LEFT_ANKLE);
+        updateOneLegPlane(currentFrame, rightLegPlane, KP_RIGHT_HIP, KP_RIGHT_KNEE, KP_RIGHT_ANKLE);
+        // After 1s flash, show graph overlay
+        setTimeout(() => {
+          showGraphOverlay('kneeangle-container', drawLegCorotationGraph);
+        }, 1000);
+      }, 500);
+    };
+
+    const onPointerUp = (e) => {
+      clearTimeout(holdTimer);
+      if (!isHold) {
+        // Tap: toggle 3D planes only (no graph)
+        if (graphOverlayActive) {
+          // If graph overlay is showing, dismiss it
+          dismissGraphOverlay();
+        } else {
+          // Toggle planes
+          planesBtn.classList.toggle('active');
+          const visible = planesBtn.classList.contains('active');
+          legPlanesGroup.visible = visible;
+          if (visible) {
+            updateOneLegPlane(currentFrame, leftLegPlane, KP_LEFT_HIP, KP_LEFT_KNEE, KP_LEFT_ANKLE);
+            updateOneLegPlane(currentFrame, rightLegPlane, KP_RIGHT_HIP, KP_RIGHT_KNEE, KP_RIGHT_ANKLE);
+          }
         }
       }
+    };
+
+    planesBtn.addEventListener('pointerdown', onPointerDown);
+    planesBtn.addEventListener('pointerup', onPointerUp);
+    planesBtn.addEventListener('pointercancel', () => clearTimeout(holdTimer));
+    planesBtn.addEventListener('contextmenu', (e) => e.preventDefault());
+    planesBtn.addEventListener('selectstart', (e) => e.preventDefault());
+    planesBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); });
+  }
+
+  // Tap on graph container dismisses overlay
+  const kneeContainer = document.getElementById('kneeangle-container');
+  if (kneeContainer) {
+    kneeContainer.addEventListener('click', () => {
+      if (graphOverlayActive) dismissGraphOverlay();
+    });
+  }
+
+  // Other visibility toggles (backtilt, separation, circle)
+  document.querySelectorAll('.toggle-btn').forEach(btn => {
+    const target = btn.dataset.target;
+    if (target === 'planes') return;  // handled above
+    btn.addEventListener('click', () => {
+      btn.classList.toggle('active');
+      const visible = btn.classList.contains('active');
       if (target === 'backtilt') {
         backPlanesGroup.visible = visible;
         const btContainer = document.getElementById('backtilt-container');
@@ -1451,32 +1714,6 @@ function initUI() {
   });
 }
 
-function createMarkers() {
-  const container = document.getElementById('markers');
-  const T = metadata.frame_count;
-
-  // Turn boundary markers
-  metadata.turn_boundaries.forEach((frame, i) => {
-    const pct = (frame / (T - 1)) * 100;
-    const label = metadata.turn_labels ? metadata.turn_labels[i] : `T${i}`;
-    const el = document.createElement('div');
-    el.className = 'turn-marker';
-    el.style.left = pct + '%';
-    el.innerHTML = `<div class="tick"></div><div class="label">${label}</div>`;
-    container.appendChild(el);
-  });
-
-  // Release marker
-  const relFrame = metadata.throw_window.release;
-  if (relFrame > 0) {
-    const pct = (relFrame / (T - 1)) * 100;
-    const el = document.createElement('div');
-    el.className = 'turn-marker release';
-    el.style.left = pct + '%';
-    el.innerHTML = `<div class="tick"></div><div class="label">REL</div>`;
-    container.appendChild(el);
-  }
-}
 
 function setFrame(f) {
   currentFrame = f;
@@ -1528,8 +1765,8 @@ function animate() {
     if (elapsed >= frameDuration) {
       lastFrameTime = now - (elapsed % frameDuration);
       currentFrame++;
-      if (currentFrame >= metadata.frame_count) {
-        currentFrame = 0;
+      if (currentFrame > timelineMax) {
+        currentFrame = timelineMin;
       }
       document.getElementById('scrubber').value = currentFrame;
       updateFrame(currentFrame);
@@ -1575,6 +1812,7 @@ async function main() {
     return;
   }
 
+  computeLastHammerFrame();
   initScene();
   createBodyMesh();
   createHammer();

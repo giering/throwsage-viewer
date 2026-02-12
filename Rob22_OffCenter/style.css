@@ -109,9 +109,30 @@ body {
   margin-top: 12px;
 }
 
+/* Screenshot button */
+#screenshot-btn {
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #444;
+  background: rgba(40, 40, 40, 0.8);
+  color: #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+#screenshot-btn:hover {
+  border-color: #4a9eff;
+  color: #4a9eff;
+}
+
 /* Fullscreen button */
 #fullscreen-btn {
-  margin-left: auto;
   width: 28px;
   height: 28px;
   border: 1px solid #444;
@@ -134,6 +155,7 @@ body {
 #canvas-container {
   width: 100%;
   height: 100%;
+  touch-action: none;
 }
 
 canvas {
@@ -184,7 +206,7 @@ canvas {
   backdrop-filter: blur(8px);
   border-top: 1px solid #333;
   padding: 8px 16px 12px;
-  z-index: 10;
+  z-index: 20;
 }
 
 #timeline-controls {
@@ -237,6 +259,35 @@ canvas {
 .speed-btn.active {
   border-color: #4a9eff;
   color: #4a9eff;
+}
+
+.group-divider {
+  width: 1px;
+  height: 16px;
+  background: #444;
+  margin: 0 4px;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+.range-btn {
+  padding: 2px 6px;
+  font-size: 11px;
+  border: 1px solid #444;
+  background: rgba(40, 40, 40, 0.8);
+  color: #888;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.range-btn:hover {
+  border-color: #666;
+  color: #ccc;
+}
+
+.range-btn.active {
+  border-color: #ff9f43;
+  color: #ff9f43;
 }
 
 #scrubber-container {
@@ -360,6 +411,9 @@ canvas {
   border-radius: 4px;
   cursor: pointer;
   text-align: left;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .toggle-btn:hover {
@@ -420,11 +474,12 @@ canvas {
 #backtilt-container,
 #separation-container,
 #kneeangle-container {
-  background: rgba(26, 26, 26, 0.9);
-  border: 2px solid #444;
+  background: #ffffff;
+  border: 1px solid #ccc;
   border-radius: 4px;
   overflow: hidden;
   display: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
 #backtilt-graph,
@@ -469,6 +524,17 @@ canvas {
   font-size: 10px;
 }
 
+/* Throw window highlight bar on scrubber */
+#throw-window-bar {
+  position: absolute;
+  height: 6px;
+  background: rgba(74, 158, 255, 0.3);
+  border-radius: 3px;
+  pointer-events: none;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
 /* ============================================
    Responsive: Tablet (≤768px)
    ============================================ */
@@ -483,7 +549,12 @@ canvas {
   #header .fps-display { display: none; }
 
   /* Hamburger visible, toggles hidden by default */
-  #hamburger-btn { display: block; }
+  #hamburger-btn {
+    display: block;
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+  }
   #toggles {
     top: 94px;
     right: 8px;
@@ -498,6 +569,17 @@ canvas {
   }
 
   #metric-graphs { left: 8px; }
+  #metric-graphs.overlay-mode {
+    position: fixed;
+    top: 40%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 15;
+  }
+  #metric-graphs.overlay-mode canvas {
+    width: 90vw;
+    height: 40vh;
+  }
   #backtilt-graph,
   #separation-graph,
   #kneeangle-graph {
@@ -512,10 +594,19 @@ canvas {
   }
 
   #timeline { padding: 6px 10px 10px; }
-  #timeline-controls { gap: 8px; }
+  #timeline-controls { gap: 4px 8px; flex-wrap: wrap; }
+  #play-btn { order: 1; }
+  #scrubber-container { order: 2; }
+  #speed-group { order: 3; width: 100%; justify-content: center; margin-top: 2px; }
 
-  #scrubber::-webkit-slider-thumb { width: 18px; height: 18px; }
-  #scrubber::-moz-range-thumb { width: 18px; height: 18px; }
+  #scrubber { height: 10px; }
+  #scrubber-container { height: 40px; }
+  #markers { height: 40px; }
+  #scrubber::-webkit-slider-thumb { width: 36px; height: 36px; }
+  #scrubber::-moz-range-thumb { width: 36px; height: 36px; }
+
+  /* Hide 0.1x speed on tablet/mobile */
+  .speed-btn[data-speed="0.1"] { display: none; }
 
   /* Hide color legend on mobile */
   #color-legend { display: none; }
@@ -583,7 +674,10 @@ canvas {
   #pip-label { font-size: 8px; padding: 1px 0; }
 
   #timeline { padding: 4px 8px 8px; }
-  #timeline-controls { gap: 6px; margin-bottom: 4px; }
+  #timeline-controls { gap: 3px 6px; flex-wrap: wrap; margin-bottom: 4px; }
+  #play-btn { order: 1; }
+  #scrubber-container { order: 2; }
+  #speed-group { order: 3; width: 100%; justify-content: center; margin-top: 1px; }
   #play-btn {
     width: 36px;
     height: 36px;
@@ -591,15 +685,18 @@ canvas {
   }
 
   #speed-group { gap: 1px; }
-  .speed-btn {
+  .speed-btn, .range-btn {
     padding: 4px 5px;
     font-size: 10px;
     min-height: 28px;
   }
+  .group-divider { height: 14px; margin: 0 3px; }
 
-  #scrubber { height: 8px; }
-  #scrubber::-webkit-slider-thumb { width: 22px; height: 22px; }
-  #scrubber::-moz-range-thumb { width: 22px; height: 22px; }
+  #scrubber { height: 6px; }
+  #scrubber-container { height: 28px; }
+  #markers { height: 28px; }
+  #scrubber::-webkit-slider-thumb { width: 24px; height: 24px; }
+  #scrubber::-moz-range-thumb { width: 24px; height: 24px; }
 
   #color-legend { display: none; }
 
@@ -647,6 +744,17 @@ canvas {
 
   /* Metric graphs — small and left-aligned */
   #metric-graphs { left: 4px; }
+  #metric-graphs.overlay-mode {
+    position: fixed;
+    top: 40%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 15;
+  }
+  #metric-graphs.overlay-mode canvas {
+    width: 80vw;
+    height: 50vh;
+  }
   #backtilt-graph,
   #separation-graph,
   #kneeangle-graph {
@@ -672,20 +780,27 @@ canvas {
 
   /* Compact timeline */
   #timeline { padding: 3px 8px 6px; }
-  #timeline-controls { gap: 6px; margin-bottom: 2px; }
+  #timeline-controls { gap: 3px 6px; flex-wrap: wrap; margin-bottom: 2px; }
+  #play-btn { order: 1; }
+  #scrubber-container { order: 2; }
+  #speed-group { order: 3; width: 100%; justify-content: center; margin-top: 1px; }
   #play-btn {
     width: 28px;
     height: 28px;
     font-size: 12px;
   }
-  .speed-btn {
+  .speed-btn, .range-btn {
     padding: 2px 4px;
     font-size: 9px;
     min-height: 24px;
   }
-  #scrubber { height: 6px; }
-  #scrubber::-webkit-slider-thumb { width: 20px; height: 20px; }
-  #scrubber::-moz-range-thumb { width: 20px; height: 20px; }
+  .group-divider { height: 12px; margin: 0 2px; }
+  #scrubber { height: 8px; }
+  #scrubber::-webkit-slider-thumb { width: 32px; height: 32px; }
+  #scrubber::-moz-range-thumb { width: 32px; height: 32px; }
+
+  /* Hide 0.1x speed in landscape */
+  .speed-btn[data-speed="0.1"] { display: none; }
 
   .turn-marker .label { font-size: 7px; }
 

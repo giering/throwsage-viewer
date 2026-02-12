@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>ThrowSage Viewer</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -33,6 +33,7 @@
     <span class="throw-name" id="throw-name">—</span>
     <span class="frame-info" id="frame-info">Frame 0 / 0</span>
     <span class="fps-display" id="fps-display"></span>
+    <button id="screenshot-btn" title="Save screenshot">&#128247;</button>
     <button id="fullscreen-btn" title="Toggle fullscreen">&#x26F6;</button>
   </div>
 
@@ -44,8 +45,6 @@
 
   <!-- Visibility toggles -->
   <div id="toggles">
-    <button class="toggle-btn active" data-target="mesh">Avatar</button>
-    <button class="toggle-btn active" data-target="hammer">Hammer</button>
     <button class="toggle-btn" data-target="planes">Leg Planes</button>
     <button class="toggle-btn" data-target="backtilt">Back Tilt</button>
     <button class="toggle-btn" data-target="separation">Separation</button>
@@ -84,8 +83,13 @@
         <button class="speed-btn" data-speed="0.25">0.25x</button>
         <button class="speed-btn" data-speed="0.5">0.5x</button>
         <button class="speed-btn active" data-speed="1">1x</button>
+        <span class="group-divider"></span>
+        <button class="range-btn active" data-range="all">All</button>
+        <button class="range-btn" data-range="wind">Wind</button>
+        <button class="range-btn" data-range="throw">Throw</button>
       </div>
       <div id="scrubber-container">
+        <div id="throw-window-bar"></div>
         <input type="range" id="scrubber" min="0" max="0" value="0" step="1">
         <div id="markers"></div>
       </div>
