@@ -155,6 +155,7 @@ body {
 #canvas-container {
   width: 100%;
   height: 100%;
+  touch-action: none;
 }
 
 canvas {
@@ -381,6 +382,9 @@ canvas {
   border-radius: 4px;
   cursor: pointer;
   text-align: left;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .toggle-btn:hover {

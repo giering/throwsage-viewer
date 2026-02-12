@@ -272,6 +272,21 @@ function initScene() {
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
     applyTimelineRange();
+    // Re-size overlay canvas if graph is active
+    if (graphOverlayActive) {
+      const kaContainer = document.getElementById('kneeangle-container');
+      if (kaContainer && kaContainer.style.display !== 'none') {
+        const canvas = kaContainer.querySelector('canvas');
+        if (canvas) {
+          requestAnimationFrame(() => {
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = Math.round(rect.width);
+            canvas.height = Math.round(rect.height);
+            drawLegCorotationGraph(currentFrame);
+          });
+        }
+      }
+    }
   });
 }
 
@@ -1597,6 +1612,9 @@ function initUI() {
     planesBtn.addEventListener('pointerdown', onPointerDown);
     planesBtn.addEventListener('pointerup', onPointerUp);
     planesBtn.addEventListener('pointercancel', () => clearTimeout(holdTimer));
+    // Suppress browser context menu and text selection on long-press
+    planesBtn.addEventListener('contextmenu', (e) => e.preventDefault());
+    planesBtn.addEventListener('selectstart', (e) => e.preventDefault());
     // Prevent default click from firing after pointer events
     planesBtn.addEventListener('click', (e) => e.stopPropagation());
   }
