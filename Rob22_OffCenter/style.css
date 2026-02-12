@@ -47,6 +47,90 @@ body {
   display: none;
 }
 
+#loading-progress {
+  width: 200px;
+  height: 4px;
+  background: #333;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+#loading-bar {
+  width: 0%;
+  height: 100%;
+  background: #4a9eff;
+  border-radius: 2px;
+  transition: width 0.2s ease;
+}
+
+#loading-bytes {
+  font-size: 12px;
+  color: #666;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Onboarding overlay */
+#onboarding {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  gap: 24px;
+  cursor: pointer;
+}
+
+#onboarding.hidden {
+  display: none;
+}
+
+#onboarding-hints {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+#onboarding .hint {
+  font-size: 18px;
+  color: #e0e0e0;
+  padding: 8px 20px;
+  background: rgba(74, 158, 255, 0.15);
+  border: 1px solid rgba(74, 158, 255, 0.3);
+  border-radius: 8px;
+}
+
+#onboarding-dismiss {
+  font-size: 13px;
+  color: #888;
+  margin-top: 12px;
+}
+
+/* Fullscreen button */
+#fullscreen-btn {
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #444;
+  background: rgba(40, 40, 40, 0.8);
+  color: #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+#fullscreen-btn:hover {
+  border-color: #4a9eff;
+  color: #4a9eff;
+}
+
 #canvas-container {
   width: 100%;
   height: 100%;
@@ -88,7 +172,6 @@ canvas {
 #header .fps-display {
   font-size: 12px;
   color: #666;
-  margin-left: auto;
 }
 
 /* Timeline panel */
@@ -436,6 +519,15 @@ canvas {
 
   /* Hide color legend on mobile */
   #color-legend { display: none; }
+
+  /* Turn markers: hide intermediate labels, keep ticks */
+  .turn-marker .label { display: none; }
+  .turn-marker:first-child .label,
+  .turn-marker.release .label { display: block; }
+
+  /* Onboarding: smaller text */
+  #onboarding .hint { font-size: 15px; padding: 6px 16px; }
+  #onboarding-dismiss { font-size: 12px; }
 }
 
 /* ============================================
@@ -510,6 +602,12 @@ canvas {
   #scrubber::-moz-range-thumb { width: 22px; height: 22px; }
 
   #color-legend { display: none; }
+
+  .turn-marker .label { display: none; }
+  .turn-marker:first-child .label,
+  .turn-marker.release .label { display: block; }
+
+  #onboarding .hint { font-size: 14px; padding: 5px 14px; }
 }
 
 /* ============================================

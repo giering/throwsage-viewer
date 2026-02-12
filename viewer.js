@@ -87,9 +87,56 @@ function createPlaneTexture(r, g, b) {
 
 // ─── Data Loading ────────────────────────────────────────────────────────────
 
+// Loading progress tracking
+let totalBytes = 0;
+let loadedBytes = 0;
+
+function updateLoadingProgress() {
+  const bar = document.getElementById('loading-bar');
+  const bytesLabel = document.getElementById('loading-bytes');
+  if (bar && totalBytes > 0) {
+    bar.style.width = Math.min(100, (loadedBytes / totalBytes) * 100).toFixed(1) + '%';
+  }
+  if (bytesLabel && totalBytes > 0) {
+    bytesLabel.textContent = `${(loadedBytes / 1048576).toFixed(1)} / ${(totalBytes / 1048576).toFixed(1)} MB`;
+  }
+}
+
 async function loadBinary(url, dtype) {
   const resp = await fetch(url);
+  const contentLength = parseInt(resp.headers.get('Content-Length'), 10);
+  if (contentLength) totalBytes += contentLength;
+  updateLoadingProgress();
+
+  // Stream the response to track progress
+  if (resp.body && contentLength > 100000) {
+    const reader = resp.body.getReader();
+    const chunks = [];
+    let received = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      received += value.length;
+      loadedBytes += value.length;
+      updateLoadingProgress();
+    }
+    const buf = new Uint8Array(received);
+    let offset = 0;
+    for (const chunk of chunks) {
+      buf.set(chunk, offset);
+      offset += chunk.length;
+    }
+    if (dtype === 'float32') return new Float32Array(buf.buffer);
+    if (dtype === 'int32') return new Int32Array(buf.buffer);
+    if (dtype === 'int8') return new Int8Array(buf.buffer);
+    return buf;
+  }
+
+  // Small files — no progress tracking needed
   const buf = await resp.arrayBuffer();
+  if (contentLength) loadedBytes += contentLength;
+  updateLoadingProgress();
   if (dtype === 'float32') return new Float32Array(buf);
   if (dtype === 'int32') return new Int32Array(buf);
   if (dtype === 'int8') return new Int8Array(buf);
@@ -1271,11 +1318,20 @@ function resetView() {
 
 // ─── UI ──────────────────────────────────────────────────────────────────────
 
+function cleanThrowName(raw) {
+  if (metadata.display_name) return metadata.display_name;
+  let name = raw || '';
+  name = name.replace(/_\d{8,}$/g, '');       // strip date suffix like _20220626
+  name = name.replace(/_small$/i, '');          // strip _small
+  name = name.replace(/_/g, ' ');               // underscores to spaces
+  return name || raw;
+}
+
 function initUI() {
   const T = metadata.frame_count;
 
-  // Header
-  document.getElementById('throw-name').textContent = metadata.throw;
+  // Header — clean display name
+  document.getElementById('throw-name').textContent = cleanThrowName(metadata.throw);
 
   // Scrubber
   const scrubber = document.getElementById('scrubber');
@@ -1328,6 +1384,21 @@ function initUI() {
   document.getElementById('reset-view-btn').addEventListener('click', () => {
     resetView();
   });
+
+  // Fullscreen toggle
+  const fsBtn = document.getElementById('fullscreen-btn');
+  if (fsBtn) {
+    fsBtn.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    });
+    document.addEventListener('fullscreenchange', () => {
+      fsBtn.textContent = document.fullscreenElement ? '\u2716' : '\u26F6';
+    });
+  }
 
   // Hamburger menu toggle
   const hamburgerBtn = document.getElementById('hamburger-btn');
@@ -1521,8 +1592,24 @@ async function main() {
   initUI();
   createColorLegend();
 
-  // Hide loading, start render loop
+  // Hide loading
   document.getElementById('loading').classList.add('hidden');
+
+  // Show onboarding on first visit
+  if (!localStorage.getItem('throwsage_onboarded')) {
+    const onboarding = document.getElementById('onboarding');
+    if (onboarding) {
+      onboarding.classList.remove('hidden');
+      const dismiss = () => {
+        onboarding.classList.add('hidden');
+        localStorage.setItem('throwsage_onboarded', '1');
+      };
+      onboarding.addEventListener('click', dismiss);
+      setTimeout(dismiss, 6000);
+    }
+  }
+
+  // Start render loop
   animate();
 }
 

@@ -11,7 +11,21 @@
   <!-- Loading overlay -->
   <div id="loading">
     <div class="spinner"></div>
-    <div class="label">Loading mesh data...</div>
+    <div class="label" id="loading-label">Loading mesh data...</div>
+    <div id="loading-progress">
+      <div id="loading-bar"></div>
+    </div>
+    <div class="label" id="loading-bytes"></div>
+  </div>
+
+  <!-- Onboarding overlay (first visit) -->
+  <div id="onboarding" class="hidden">
+    <div id="onboarding-hints">
+      <div class="hint">Drag to rotate</div>
+      <div class="hint">Pinch to zoom</div>
+      <div class="hint">Scrub timeline to step through frames</div>
+    </div>
+    <div id="onboarding-dismiss">Tap anywhere to start</div>
   </div>
 
   <!-- Header -->
@@ -19,6 +33,7 @@
     <span class="throw-name" id="throw-name">—</span>
     <span class="frame-info" id="frame-info">Frame 0 / 0</span>
     <span class="fps-display" id="fps-display"></span>
+    <button id="fullscreen-btn" title="Toggle fullscreen">&#x26F6;</button>
   </div>
 
   <!-- Three.js canvas -->
