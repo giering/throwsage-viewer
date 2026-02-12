@@ -14,6 +14,8 @@ let currentFrame = 0;
 let playing = false;
 let lastFrameTime = 0;
 let playbackSpeed = 1.0;
+let timelineMin = 0;
+let timelineMax = 0;
 
 // Three.js objects
 let renderer, scene, camera, controls;
@@ -224,7 +226,7 @@ function initScene() {
   const container = document.getElementById('canvas-container');
 
   // Renderer
-  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setClearColor(0x1a1a1a);
@@ -269,6 +271,7 @@ function initScene() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    applyTimelineRange();
   });
 }
 
@@ -532,15 +535,12 @@ function updateOneLegPlane(frame, pl, hipIdx, kneeIdx, ankleIdx) {
 }
 
 function updateLegPlanes(frame) {
-  // Always update graph if visible
+  // Update graph cursor if graph is visible (timeline scrubbing updates the graph)
   const kaContainer = document.getElementById('kneeangle-container');
   if (kaContainer && kaContainer.style.display !== 'none' && legAlignmentData) {
     drawLegCorotationGraph(frame);
   }
-
-  if (!legPlanesGroup || !legPlanesGroup.visible) return;
-  updateOneLegPlane(frame, leftLegPlane,  KP_LEFT_HIP,  KP_LEFT_KNEE,  KP_LEFT_ANKLE);
-  updateOneLegPlane(frame, rightLegPlane, KP_RIGHT_HIP, KP_RIGHT_KNEE, KP_RIGHT_ANKLE);
+  // Plane geometry is NOT updated per frame — planes are static at activation frame
 }
 
 // ─── Leg Co-rotation Graph ──────────────────────────────────────────────────
@@ -1316,7 +1316,133 @@ function resetView() {
   }
 }
 
+// ─── Timeline Range (mobile: T0 to Release) ─────────────────────────────────
+
+function getTimelineRange() {
+  const T = metadata.frame_count;
+  if (window.innerWidth > 768) return { min: 0, max: T - 1 };
+  const tw = metadata.throw_window;
+  if (tw && typeof tw.start === 'number' && typeof tw.release === 'number' &&
+      tw.start >= 0 && tw.release > tw.start && tw.release < T) {
+    return { min: tw.start, max: tw.release };
+  }
+  return { min: 0, max: T - 1 };
+}
+
+function applyTimelineRange() {
+  const range = getTimelineRange();
+  timelineMin = range.min;
+  timelineMax = range.max;
+  const scrubber = document.getElementById('scrubber');
+  if (scrubber) {
+    scrubber.min = timelineMin;
+    scrubber.max = timelineMax;
+    if (currentFrame < timelineMin) { currentFrame = timelineMin; scrubber.value = currentFrame; updateFrame(currentFrame); }
+    if (currentFrame > timelineMax) { currentFrame = timelineMax; scrubber.value = currentFrame; updateFrame(currentFrame); }
+  }
+  rebuildMarkers();
+}
+
+function rebuildMarkers() {
+  const container = document.getElementById('markers');
+  if (!container || !metadata) return;
+  container.innerHTML = '';
+  const range = timelineMax - timelineMin;
+  if (range <= 0) return;
+
+  if (metadata.turn_boundaries) {
+    metadata.turn_boundaries.forEach((frame, i) => {
+      if (frame < timelineMin || frame > timelineMax) return;
+      const pct = ((frame - timelineMin) / range) * 100;
+      const label = metadata.turn_labels ? metadata.turn_labels[i] : `T${i}`;
+      const el = document.createElement('div');
+      el.className = 'turn-marker';
+      el.style.left = pct + '%';
+      el.innerHTML = `<div class="tick"></div><div class="label">${label}</div>`;
+      container.appendChild(el);
+    });
+  }
+
+  const relFrame = metadata.throw_window && metadata.throw_window.release;
+  if (relFrame && relFrame >= timelineMin && relFrame <= timelineMax) {
+    const pct = ((relFrame - timelineMin) / range) * 100;
+    const el = document.createElement('div');
+    el.className = 'turn-marker release';
+    el.style.left = pct + '%';
+    el.innerHTML = `<div class="tick"></div><div class="label">REL</div>`;
+    container.appendChild(el);
+  }
+}
+
 // ─── UI ──────────────────────────────────────────────────────────────────────
+
+// ─── Graph Overlay System ─────────────────────────────────────────────────────
+
+let graphOverlayActive = false;
+
+function showGraphOverlay(containerId, drawFn) {
+  const isMobile = window.innerWidth <= 768;
+  const backdrop = document.getElementById('graph-backdrop');
+  const metricGraphs = document.getElementById('metric-graphs');
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  graphOverlayActive = true;
+  container.style.display = 'block';
+
+  if (isMobile) {
+    // Mobile: full-screen overlay with backdrop
+    backdrop.classList.remove('hidden');
+    requestAnimationFrame(() => backdrop.classList.add('visible'));
+    metricGraphs.classList.add('overlay-mode');
+    requestAnimationFrame(() => {
+      metricGraphs.classList.add('visible');
+      // Resize canvas to match CSS size
+      const canvas = container.querySelector('canvas');
+      if (canvas) {
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * window.devicePixelRatio;
+        canvas.height = rect.height * window.devicePixelRatio;
+        const ctx = canvas.getContext('2d');
+        ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+      }
+      drawFn(currentFrame);
+    });
+  } else {
+    // Desktop: show in normal left-side position
+    drawFn(currentFrame);
+  }
+}
+
+function dismissGraphOverlay() {
+  const backdrop = document.getElementById('graph-backdrop');
+  const metricGraphs = document.getElementById('metric-graphs');
+  const kaContainer = document.getElementById('kneeangle-container');
+
+  graphOverlayActive = false;
+
+  // Fade out backdrop
+  backdrop.classList.remove('visible');
+  setTimeout(() => backdrop.classList.add('hidden'), 300);
+
+  // Reset overlay mode
+  metricGraphs.classList.remove('visible', 'overlay-mode');
+
+  // Hide the graph container
+  if (kaContainer) kaContainer.style.display = 'none';
+
+  // Reset canvas size to default
+  const canvas = document.getElementById('kneeangle-graph');
+  if (canvas) {
+    canvas.width = 360;
+    canvas.height = 140;
+  }
+
+  // Also hide leg planes and deactivate button
+  if (legPlanesGroup) legPlanesGroup.visible = false;
+  const planesBtn = document.querySelector('.toggle-btn[data-target="planes"]');
+  if (planesBtn) planesBtn.classList.remove('active');
+}
 
 function cleanThrowName(raw) {
   if (metadata.display_name) return metadata.display_name;
@@ -1367,16 +1493,16 @@ function initUI() {
       playBtn.click();
     } else if (e.code === 'ArrowLeft') {
       e.preventDefault();
-      setFrame(Math.max(0, currentFrame - 1));
+      setFrame(Math.max(timelineMin, currentFrame - 1));
     } else if (e.code === 'ArrowRight') {
       e.preventDefault();
-      setFrame(Math.min(T - 1, currentFrame + 1));
+      setFrame(Math.min(timelineMax, currentFrame + 1));
     } else if (e.code === 'Home') {
       e.preventDefault();
-      setFrame(0);
+      setFrame(timelineMin);
     } else if (e.code === 'End') {
       e.preventDefault();
-      setFrame(T - 1);
+      setFrame(timelineMax);
     }
   });
 
@@ -1400,6 +1526,19 @@ function initUI() {
     });
   }
 
+  // Screenshot button
+  const ssBtn = document.getElementById('screenshot-btn');
+  if (ssBtn) {
+    ssBtn.addEventListener('click', () => {
+      const dataURL = renderer.domElement.toDataURL('image/png');
+      const link = document.createElement('a');
+      const throwName = (metadata.throw || 'throw').replace(/\s+/g, '_');
+      link.download = `${throwName}_frame${currentFrame}.png`;
+      link.href = dataURL;
+      link.click();
+    });
+  }
+
   // Hamburger menu toggle
   const hamburgerBtn = document.getElementById('hamburger-btn');
   const togglesPanel = document.getElementById('toggles');
@@ -1413,26 +1552,72 @@ function initUI() {
     });
   }
 
-  // Turn markers
-  createMarkers();
+  // Timeline range + turn markers
+  applyTimelineRange();
 
-  // Visibility toggles
-  document.querySelectorAll('.toggle-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      btn.classList.toggle('active');
-      const target = btn.dataset.target;
-      const visible = btn.classList.contains('active');
-      if (target === 'mesh') bodyMesh.visible = visible;
-      if (target === 'hammer') hammerSphere.visible = visible;
-      if (target === 'planes') {
-        legPlanesGroup.visible = visible;
-        const kaContainer = document.getElementById('kneeangle-container');
-        if (kaContainer) kaContainer.style.display = visible ? 'block' : 'none';
-        if (visible) {
-          updateLegPlanes(currentFrame);
-          if (legAlignmentData) drawLegCorotationGraph(currentFrame);
+  // Visibility toggles — Leg Planes uses tap/hold, others use simple click
+  const planesBtn = document.querySelector('.toggle-btn[data-target="planes"]');
+  if (planesBtn) {
+    let holdTimer = null;
+    let isHold = false;
+
+    const onPointerDown = (e) => {
+      e.preventDefault();
+      isHold = false;
+      holdTimer = setTimeout(() => {
+        isHold = true;
+        // Show leg planes at current frame (static)
+        planesBtn.classList.add('active');
+        legPlanesGroup.visible = true;
+        updateOneLegPlane(currentFrame, leftLegPlane, KP_LEFT_HIP, KP_LEFT_KNEE, KP_LEFT_ANKLE);
+        updateOneLegPlane(currentFrame, rightLegPlane, KP_RIGHT_HIP, KP_RIGHT_KNEE, KP_RIGHT_ANKLE);
+        // After 1s flash, show graph overlay
+        setTimeout(() => {
+          showGraphOverlay('kneeangle-container', drawLegCorotationGraph);
+        }, 1000);
+      }, 500);
+    };
+
+    const onPointerUp = (e) => {
+      clearTimeout(holdTimer);
+      if (!isHold) {
+        // Tap: toggle 3D planes only (no graph)
+        if (graphOverlayActive) {
+          // If graph overlay is showing, dismiss it
+          dismissGraphOverlay();
+        } else {
+          // Toggle planes
+          planesBtn.classList.toggle('active');
+          const visible = planesBtn.classList.contains('active');
+          legPlanesGroup.visible = visible;
+          if (visible) {
+            updateOneLegPlane(currentFrame, leftLegPlane, KP_LEFT_HIP, KP_LEFT_KNEE, KP_LEFT_ANKLE);
+            updateOneLegPlane(currentFrame, rightLegPlane, KP_RIGHT_HIP, KP_RIGHT_KNEE, KP_RIGHT_ANKLE);
+          }
         }
       }
+    };
+
+    planesBtn.addEventListener('pointerdown', onPointerDown);
+    planesBtn.addEventListener('pointerup', onPointerUp);
+    planesBtn.addEventListener('pointercancel', () => clearTimeout(holdTimer));
+    // Prevent default click from firing after pointer events
+    planesBtn.addEventListener('click', (e) => e.stopPropagation());
+  }
+
+  // Backdrop dismiss — click/tap dismisses graph overlay
+  const backdrop = document.getElementById('graph-backdrop');
+  if (backdrop) {
+    backdrop.addEventListener('click', dismissGraphOverlay);
+  }
+
+  // Other visibility toggles (backtilt, separation, circle)
+  document.querySelectorAll('.toggle-btn').forEach(btn => {
+    const target = btn.dataset.target;
+    if (target === 'planes') return;  // handled above
+    btn.addEventListener('click', () => {
+      btn.classList.toggle('active');
+      const visible = btn.classList.contains('active');
       if (target === 'backtilt') {
         backPlanesGroup.visible = visible;
         const btContainer = document.getElementById('backtilt-container');
@@ -1451,32 +1636,6 @@ function initUI() {
   });
 }
 
-function createMarkers() {
-  const container = document.getElementById('markers');
-  const T = metadata.frame_count;
-
-  // Turn boundary markers
-  metadata.turn_boundaries.forEach((frame, i) => {
-    const pct = (frame / (T - 1)) * 100;
-    const label = metadata.turn_labels ? metadata.turn_labels[i] : `T${i}`;
-    const el = document.createElement('div');
-    el.className = 'turn-marker';
-    el.style.left = pct + '%';
-    el.innerHTML = `<div class="tick"></div><div class="label">${label}</div>`;
-    container.appendChild(el);
-  });
-
-  // Release marker
-  const relFrame = metadata.throw_window.release;
-  if (relFrame > 0) {
-    const pct = (relFrame / (T - 1)) * 100;
-    const el = document.createElement('div');
-    el.className = 'turn-marker release';
-    el.style.left = pct + '%';
-    el.innerHTML = `<div class="tick"></div><div class="label">REL</div>`;
-    container.appendChild(el);
-  }
-}
 
 function setFrame(f) {
   currentFrame = f;
@@ -1528,8 +1687,8 @@ function animate() {
     if (elapsed >= frameDuration) {
       lastFrameTime = now - (elapsed % frameDuration);
       currentFrame++;
-      if (currentFrame >= metadata.frame_count) {
-        currentFrame = 0;
+      if (currentFrame > timelineMax) {
+        currentFrame = timelineMin;
       }
       document.getElementById('scrubber').value = currentFrame;
       updateFrame(currentFrame);

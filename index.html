@@ -33,6 +33,7 @@
     <span class="throw-name" id="throw-name">—</span>
     <span class="frame-info" id="frame-info">Frame 0 / 0</span>
     <span class="fps-display" id="fps-display"></span>
+    <button id="screenshot-btn" title="Save screenshot">&#128247;</button>
     <button id="fullscreen-btn" title="Toggle fullscreen">&#x26F6;</button>
   </div>
 
@@ -44,8 +45,6 @@
 
   <!-- Visibility toggles -->
   <div id="toggles">
-    <button class="toggle-btn active" data-target="mesh">Avatar</button>
-    <button class="toggle-btn active" data-target="hammer">Hammer</button>
     <button class="toggle-btn" data-target="planes">Leg Planes</button>
     <button class="toggle-btn" data-target="backtilt">Back Tilt</button>
     <button class="toggle-btn" data-target="separation">Separation</button>
@@ -58,6 +57,9 @@
     <img id="pip-frame" alt="Video frame">
     <div id="pip-label">Frame 0</div>
   </div>
+
+  <!-- Graph overlay backdrop -->
+  <div id="graph-backdrop" class="hidden"></div>
 
   <!-- Metric graph overlays -->
   <div id="metric-graphs">

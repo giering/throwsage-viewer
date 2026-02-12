@@ -109,9 +109,30 @@ body {
   margin-top: 12px;
 }
 
+/* Screenshot button */
+#screenshot-btn {
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #444;
+  background: rgba(40, 40, 40, 0.8);
+  color: #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+#screenshot-btn:hover {
+  border-color: #4a9eff;
+  color: #4a9eff;
+}
+
 /* Fullscreen button */
 #fullscreen-btn {
-  margin-left: auto;
   width: 28px;
   height: 28px;
   border: 1px solid #444;
@@ -469,6 +490,25 @@ canvas {
   font-size: 10px;
 }
 
+/* Graph overlay backdrop */
+#graph-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 25;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  cursor: pointer;
+}
+
+#graph-backdrop.visible {
+  opacity: 1;
+}
+
+#graph-backdrop.hidden {
+  display: none;
+}
+
 /* ============================================
    Responsive: Tablet (≤768px)
    ============================================ */
@@ -498,6 +538,20 @@ canvas {
   }
 
   #metric-graphs { left: 8px; }
+  #metric-graphs.overlay-mode {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 30;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  #metric-graphs.overlay-mode.visible { opacity: 1; }
+  #metric-graphs.overlay-mode canvas {
+    width: 90vw;
+    height: 40vh;
+  }
   #backtilt-graph,
   #separation-graph,
   #kneeangle-graph {
@@ -514,8 +568,14 @@ canvas {
   #timeline { padding: 6px 10px 10px; }
   #timeline-controls { gap: 8px; }
 
-  #scrubber::-webkit-slider-thumb { width: 18px; height: 18px; }
-  #scrubber::-moz-range-thumb { width: 18px; height: 18px; }
+  #scrubber { height: 10px; }
+  #scrubber-container { height: 40px; }
+  #markers { height: 40px; }
+  #scrubber::-webkit-slider-thumb { width: 36px; height: 36px; }
+  #scrubber::-moz-range-thumb { width: 36px; height: 36px; }
+
+  /* Hide 0.1x speed on tablet/mobile */
+  .speed-btn[data-speed="0.1"] { display: none; }
 
   /* Hide color legend on mobile */
   #color-legend { display: none; }
@@ -597,9 +657,11 @@ canvas {
     min-height: 28px;
   }
 
-  #scrubber { height: 8px; }
-  #scrubber::-webkit-slider-thumb { width: 22px; height: 22px; }
-  #scrubber::-moz-range-thumb { width: 22px; height: 22px; }
+  #scrubber { height: 12px; }
+  #scrubber-container { height: 48px; }
+  #markers { height: 48px; }
+  #scrubber::-webkit-slider-thumb { width: 44px; height: 44px; }
+  #scrubber::-moz-range-thumb { width: 44px; height: 44px; }
 
   #color-legend { display: none; }
 
@@ -683,9 +745,12 @@ canvas {
     font-size: 9px;
     min-height: 24px;
   }
-  #scrubber { height: 6px; }
-  #scrubber::-webkit-slider-thumb { width: 20px; height: 20px; }
-  #scrubber::-moz-range-thumb { width: 20px; height: 20px; }
+  #scrubber { height: 8px; }
+  #scrubber::-webkit-slider-thumb { width: 32px; height: 32px; }
+  #scrubber::-moz-range-thumb { width: 32px; height: 32px; }
+
+  /* Hide 0.1x speed in landscape */
+  .speed-btn[data-speed="0.1"] { display: none; }
 
   .turn-marker .label { font-size: 7px; }
 
