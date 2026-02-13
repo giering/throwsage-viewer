@@ -1,31 +1,12 @@
 {
-  "version": "3.0",
-  "coord_space": "world",
-  "gravity_source": "foot_contact_svd",
+  "version": "2.0",
+  "coord_space": "camera",
   "throw": "SeanCExemplar4T_small",
   "frame_count": 160,
   "fps": 23.97599983215332,
   "vertex_count": 9002,
   "face_count": 18000,
   "focal_length": 2202.9072265625,
-  "camera_position": [
-    0.04675878875684102,
-    -0.08644689595794057,
-    0.239755637538883
-  ],
-  "camera_target": [
-    -0.3867119252681732,
-    0.0852280780673027,
-    -3.632079839706421
-  ],
-  "camera_up": [
-    0,
-    1,
-    0
-  ],
-  "ground_y": -0.886394670009613,
-  "ground_plane_rmse": 0.05137116089463234,
-  "ground_contact_points": 114,
   "files": {
     "vertices": "vertices.bin",
     "faces": "faces.bin",
@@ -33,7 +14,10 @@
     "hammer": "hammer.bin",
     "fill_type": "fill_type.bin",
     "support_state": "support_state.bin",
-    "leg_alignment": "leg_alignment.bin"
+    "leg_alignment": "leg_alignment.bin",
+    "separation": "separation.bin",
+    "back_lean": "back_lean.bin",
+    "circle_positions": "circle_positions.bin"
   },
   "has_vertex_colors": false,
   "turn_boundaries": [
@@ -55,13 +39,14 @@
     "release": 124
   },
   "circle": {
-    "center": [
-      -0.3041460995546836,
-      -0.886394670009613,
-      -4.367286039601472
+    "center_cam": [
+      -0.20017854869365692,
+      0.8038583397865295,
+      4.617536544799805
     ],
     "radius": 1.0674999952316284,
-    "detected": true
+    "detected": true,
+    "per_frame": true
   },
   "pip_thumbnails": {
     "dir": "frames_thumb",

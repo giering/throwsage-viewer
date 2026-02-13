@@ -31,8 +31,12 @@ let groundY = -Infinity;
 let separationAngles = null;   // Float32Array(T)
 let separationEnabled = true;
 
+// Pipeline-precomputed metric arrays (loaded from binary when available)
+let pipelineSeparation = null;  // Float32Array(T) — sep_pelvis_thorax_deg from analytics
+let pipelineBackLean = null;    // Float32Array(T) — back_lean_deg from analytics
+
 // Support state
-let supportStateData = null;   // Int8Array(T) — 1=SS, 0=DS
+let supportStateData = null;   // Int8Array(T) — 1=SS, 2=DS (matches analytics pipeline)
 
 // Orbit extremes (high/low points per turn)
 let orbitExtremes = [];        // [{frame, pos:[x,y,z], type:'high'|'low', turnFrameCount, sphere}, ...]
@@ -187,6 +191,16 @@ async function loadData() {
   // Load leg alignment (precomputed from analytics) if available
   if (metadata.files.leg_alignment) {
     legAlignmentData = await loadBinary(metadata.files.leg_alignment, 'float32');
+  }
+
+  // Load precomputed separation and back lean from analytics pipeline
+  if (metadata.files.separation) {
+    pipelineSeparation = await loadBinary(metadata.files.separation, 'float32');
+    console.log(`Loaded pipeline separation: ${pipelineSeparation.length} frames`);
+  }
+  if (metadata.files.back_lean) {
+    pipelineBackLean = await loadBinary(metadata.files.back_lean, 'float32');
+    console.log(`Loaded pipeline back lean: ${pipelineBackLean.length} frames`);
   }
 
   // Load static vertex colors if available (from paint_mesh_from_video.py)
@@ -430,62 +444,59 @@ function precomputeOrbitExtremes() {
   const throwRelease = tw.release || (metadata.frame_count - 1);
   const boundaries = metadata.turn_boundaries;
 
-  // Include a pre-T0 segment: the low point often occurs just before T0
-  if (boundaries.length >= 2) {
-    const halfTurn = Math.round((boundaries[1] - boundaries[0]) / 2);
-    const preStart = Math.max(0, boundaries[0] - halfTurn);
-    const preEnd = boundaries[0];
-    if (preEnd > preStart) {
-      const preTurnFrames = preEnd - preStart;
-      let minY = Infinity, minFrame = preStart;
-      for (let f = preStart; f <= preEnd; f++) {
-        const off = f * 3;
-        if (isNaN(hammerData[off])) continue;
-        if (hammerData[off] === 0 && hammerData[off + 1] === 0 && hammerData[off + 2] === 0) continue;
-        const [, y] = camToThree(hammerData[off], hammerData[off + 1], hammerData[off + 2]);
-        if (y < minY) { minY = y; minFrame = f; }
-      }
-      if (minY < Infinity) {
-        const offL = minFrame * 3;
-        const [lx, ly, lz] = camToThree(hammerData[offL], hammerData[offL + 1], hammerData[offL + 2]);
-        orbitExtremes.push({ frame: minFrame, pos: [lx, ly, lz], type: 'low', turnFrameCount: preTurnFrames });
-      }
+  // Helper: get hammer Y at frame (Three.js Y = up)
+  function hammerY(f) {
+    const off = f * 3;
+    if (isNaN(hammerData[off])) return null;
+    if (hammerData[off] === 0 && hammerData[off + 1] === 0 && hammerData[off + 2] === 0) return null;
+    return camToThree(hammerData[off], hammerData[off + 1], hammerData[off + 2])[1];
+  }
+
+  function hammerPos(f) {
+    const off = f * 3;
+    return camToThree(hammerData[off], hammerData[off + 1], hammerData[off + 2]);
+  }
+
+  // N turns (between consecutive boundaries) → N high points, N+1 low points
+  // Step 1: Find one HIGH per turn segment (max Y between boundary[i] and boundary[i+1])
+  const highFrames = [];
+  for (let i = 0; i < boundaries.length - 1; i++) {
+    const segStart = boundaries[i];
+    const segEnd = boundaries[i + 1];
+    let maxY = -Infinity, maxFrame = segStart;
+    for (let f = segStart; f <= segEnd; f++) {
+      const y = hammerY(f);
+      if (y !== null && y > maxY) { maxY = y; maxFrame = f; }
+    }
+    if (maxY > -Infinity) {
+      highFrames.push(maxFrame);
+      const [hx, hy, hz] = hammerPos(maxFrame);
+      orbitExtremes.push({ frame: maxFrame, pos: [hx, hy, hz], type: 'high', turnFrameCount: segEnd - segStart });
     }
   }
 
-  for (let i = 0; i < boundaries.length - 1; i++) {
-    let segStart = boundaries[i];
-    let segEnd = boundaries[i + 1];
+  // Step 2: Find N+1 LOW points in the gaps between highs
+  // Segments: [pre-T0 start, high[0]], [high[0], high[1]], ..., [high[N-1], release]
+  const halfTurn = boundaries.length >= 2 ? Math.round((boundaries[1] - boundaries[0]) / 2) : 10;
+  const lowSearchStart = Math.max(0, boundaries[0] - halfTurn);
+  const lowSegments = [];
+  if (highFrames.length > 0) {
+    lowSegments.push([lowSearchStart, highFrames[0]]);
+    for (let i = 0; i < highFrames.length - 1; i++) {
+      lowSegments.push([highFrames[i], highFrames[i + 1]]);
+    }
+    lowSegments.push([highFrames[highFrames.length - 1], throwRelease]);
+  }
 
-    // Clip to throw window
-    if (segEnd < throwStart || segStart > throwRelease) continue;
-    segStart = Math.max(segStart, throwStart);
-    segEnd = Math.min(segEnd, throwRelease);
-
+  for (const [segStart, segEnd] of lowSegments) {
+    let minY = Infinity, minFrame = segStart;
     const turnFrameCount = segEnd - segStart;
-    if (turnFrameCount < 2) continue;
-
-    let maxY = -Infinity, minY = Infinity;
-    let maxFrame = segStart, minFrame = segStart;
-
     for (let f = segStart; f <= segEnd; f++) {
-      const off = f * 3;
-      if (isNaN(hammerData[off])) continue;
-      if (hammerData[off] === 0 && hammerData[off + 1] === 0 && hammerData[off + 2] === 0) continue;
-
-      const [, y] = camToThree(hammerData[off], hammerData[off + 1], hammerData[off + 2]);
-      if (y > maxY) { maxY = y; maxFrame = f; }
-      if (y < minY) { minY = y; minFrame = f; }
+      const y = hammerY(f);
+      if (y !== null && y < minY) { minY = y; minFrame = f; }
     }
-
-    if (maxY > -Infinity) {
-      const offH = maxFrame * 3;
-      const [hx, hy, hz] = camToThree(hammerData[offH], hammerData[offH + 1], hammerData[offH + 2]);
-      orbitExtremes.push({ frame: maxFrame, pos: [hx, hy, hz], type: 'high', turnFrameCount });
-    }
-    if (minY < Infinity && minFrame !== maxFrame) {
-      const offL = minFrame * 3;
-      const [lx, ly, lz] = camToThree(hammerData[offL], hammerData[offL + 1], hammerData[offL + 2]);
+    if (minY < Infinity) {
+      const [lx, ly, lz] = hammerPos(minFrame);
       orbitExtremes.push({ frame: minFrame, pos: [lx, ly, lz], type: 'low', turnFrameCount });
     }
   }
@@ -781,7 +792,7 @@ function drawLegCorotationGraph(frame) {
 
   // Plot line — DS bold green, SS faded gray
   for (let i = fStart + 1; i <= fEnd; i++) {
-    const isDS = supportStateData ? (supportStateData[i] === 0) : true;
+    const isDS = supportStateData ? (supportStateData[i] === 2) : true;
     ctx.strokeStyle = isDS ? '#228B22' : 'rgba(180, 180, 180, 0.7)';
     ctx.lineWidth = isDS ? 2.5 : 1.0;
     ctx.beginPath();
@@ -843,10 +854,17 @@ function computeBackTiltAngle(frame) {
 
 function precomputeBackTilt() {
   const T = metadata.frame_count;
+  if (pipelineBackLean && pipelineBackLean.length === T) {
+    backTiltAngles = pipelineBackLean;
+    console.log('Using pipeline-precomputed back lean angles');
+    return;
+  }
+  // Fallback: compute live from keypoints (less accurate)
   backTiltAngles = new Float32Array(T);
   for (let i = 0; i < T; i++) {
     backTiltAngles[i] = computeBackTiltAngle(i);
   }
+  console.log('Using live-computed back tilt angles (no pipeline data)');
 }
 
 function drawSSDSShading(ctx, xPx, pad, plotH, fStart, fEnd) {
@@ -864,14 +882,16 @@ function drawSSDSShading(ctx, xPx, pad, plotH, fStart, fEnd) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.07)';
         ctx.fillRect(x0, pad.top, x1 - x0, plotH);
       }
-      // Label at bottom of region
-      const midX = (x0 + x1) / 2;
-      const label = regionState === 1 ? 'SS' : 'DS';
-      ctx.fillStyle = '#999';
-      ctx.font = 'bold 8px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'bottom';
-      ctx.fillText(label, midX, pad.top + plotH - 1);
+      // Label at bottom of region (skip value 0 = outside throw window)
+      if (regionState === 1 || regionState === 2) {
+        const midX = (x0 + x1) / 2;
+        const label = regionState === 1 ? 'SS' : 'DS';
+        ctx.fillStyle = '#999';
+        ctx.font = 'bold 8px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(label, midX, pad.top + plotH - 1);
+      }
       regionStart = i;
       regionState = s;
     }
@@ -1112,10 +1132,17 @@ function computeSeparationAngle(frame) {
 
 function precomputeSeparation() {
   const T = metadata.frame_count;
+  if (pipelineSeparation && pipelineSeparation.length === T) {
+    separationAngles = pipelineSeparation;
+    console.log('Using pipeline-precomputed separation angles');
+    return;
+  }
+  // Fallback: compute live from keypoints (less accurate)
   separationAngles = new Float32Array(T);
   for (let i = 0; i < T; i++) {
     separationAngles[i] = computeSeparationAngle(i);
   }
+  console.log('Using live-computed separation angles (no pipeline data)');
 }
 
 const SKIN_R = 0.2, SKIN_G = 0.4, SKIN_B = 0.8;
