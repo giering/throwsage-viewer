@@ -29,10 +29,14 @@ let groundY = -Infinity;
 
 // Separation metric
 let separationAngles = null;   // Float32Array(T)
-let separationEnabled = false;
+let separationEnabled = true;
 
 // Support state
 let supportStateData = null;   // Int8Array(T) — 1=SS, 0=DS
+
+// Orbit extremes (high/low points per turn)
+let orbitExtremes = [];        // [{frame, pos:[x,y,z], type:'high'|'low', turnFrameCount, sphere}, ...]
+let orbitExtremesGroup = null;
 
 // Per-vertex colors (from paint_mesh_from_video.py)
 let vertexColorsData = null;   // Float32Array(V * 3) — static RGB per vertex
@@ -282,15 +286,17 @@ function initScene() {
     applyTimelineRange();
     // Re-size overlay canvas if graph is active
     if (graphOverlayActive) {
-      const kaContainer = document.getElementById('kneeangle-container');
-      if (kaContainer && kaContainer.style.display !== 'none') {
-        const canvas = kaContainer.querySelector('canvas');
+      const overlayId = activeOverlaySource === 'separation' ? 'separation-container' : 'kneeangle-container';
+      const drawFn = activeOverlaySource === 'separation' ? drawSeparationGraph : drawLegCorotationGraph;
+      const oc = document.getElementById(overlayId);
+      if (oc && oc.style.display !== 'none') {
+        const canvas = oc.querySelector('canvas');
         if (canvas) {
           requestAnimationFrame(() => {
             const rect = canvas.getBoundingClientRect();
             canvas.width = Math.round(rect.width);
             canvas.height = Math.round(rect.height);
-            drawLegCorotationGraph(currentFrame);
+            drawFn(currentFrame);
           });
         }
       }
@@ -312,15 +318,15 @@ function createBodyMesh() {
   posAttr.setUsage(THREE.StreamDrawUsage);
   geometry.setAttribute('position', posAttr);
 
-  // Vertex colors — use painted colors if available, else skin tone
+  // Vertex colors — use painted colors if available, else blue
   const colorArray = new Float32Array(V * 3);
   if (vertexColorsData && vertexColorsData.length === V * 3) {
     colorArray.set(vertexColorsData);
   } else {
     for (let i = 0; i < V; i++) {
-      colorArray[i * 3]     = 0.831;
-      colorArray[i * 3 + 1] = 0.647;
-      colorArray[i * 3 + 2] = 0.455;
+      colorArray[i * 3]     = SKIN_R;
+      colorArray[i * 3 + 1] = SKIN_G;
+      colorArray[i * 3 + 2] = SKIN_B;
     }
   }
   const colorAttr = new THREE.BufferAttribute(colorArray, 3);
@@ -410,6 +416,124 @@ function updateHammerFrame(frame) {
     const scheme = FILL_TYPE_COLORS[ft] || FILL_TYPE_COLORS[0];
     hammerSphere.material.color.setHex(scheme.color);
     hammerSphere.material.emissive.setHex(scheme.emissive);
+  }
+}
+
+// ─── Orbit Extremes (High/Low Points) ────────────────────────────────────────
+
+function precomputeOrbitExtremes() {
+  orbitExtremes = [];
+  if (!hammerData || !metadata.turn_boundaries || metadata.turn_boundaries.length < 2) return;
+
+  const tw = metadata.throw_window || {};
+  const throwStart = tw.start || 0;
+  const throwRelease = tw.release || (metadata.frame_count - 1);
+  const boundaries = metadata.turn_boundaries;
+
+  // Include a pre-T0 segment: the low point often occurs just before T0
+  if (boundaries.length >= 2) {
+    const halfTurn = Math.round((boundaries[1] - boundaries[0]) / 2);
+    const preStart = Math.max(0, boundaries[0] - halfTurn);
+    const preEnd = boundaries[0];
+    if (preEnd > preStart) {
+      const preTurnFrames = preEnd - preStart;
+      let minY = Infinity, minFrame = preStart;
+      for (let f = preStart; f <= preEnd; f++) {
+        const off = f * 3;
+        if (isNaN(hammerData[off])) continue;
+        if (hammerData[off] === 0 && hammerData[off + 1] === 0 && hammerData[off + 2] === 0) continue;
+        const [, y] = camToThree(hammerData[off], hammerData[off + 1], hammerData[off + 2]);
+        if (y < minY) { minY = y; minFrame = f; }
+      }
+      if (minY < Infinity) {
+        const offL = minFrame * 3;
+        const [lx, ly, lz] = camToThree(hammerData[offL], hammerData[offL + 1], hammerData[offL + 2]);
+        orbitExtremes.push({ frame: minFrame, pos: [lx, ly, lz], type: 'low', turnFrameCount: preTurnFrames });
+      }
+    }
+  }
+
+  for (let i = 0; i < boundaries.length - 1; i++) {
+    let segStart = boundaries[i];
+    let segEnd = boundaries[i + 1];
+
+    // Clip to throw window
+    if (segEnd < throwStart || segStart > throwRelease) continue;
+    segStart = Math.max(segStart, throwStart);
+    segEnd = Math.min(segEnd, throwRelease);
+
+    const turnFrameCount = segEnd - segStart;
+    if (turnFrameCount < 2) continue;
+
+    let maxY = -Infinity, minY = Infinity;
+    let maxFrame = segStart, minFrame = segStart;
+
+    for (let f = segStart; f <= segEnd; f++) {
+      const off = f * 3;
+      if (isNaN(hammerData[off])) continue;
+      if (hammerData[off] === 0 && hammerData[off + 1] === 0 && hammerData[off + 2] === 0) continue;
+
+      const [, y] = camToThree(hammerData[off], hammerData[off + 1], hammerData[off + 2]);
+      if (y > maxY) { maxY = y; maxFrame = f; }
+      if (y < minY) { minY = y; minFrame = f; }
+    }
+
+    if (maxY > -Infinity) {
+      const offH = maxFrame * 3;
+      const [hx, hy, hz] = camToThree(hammerData[offH], hammerData[offH + 1], hammerData[offH + 2]);
+      orbitExtremes.push({ frame: maxFrame, pos: [hx, hy, hz], type: 'high', turnFrameCount });
+    }
+    if (minY < Infinity && minFrame !== maxFrame) {
+      const offL = minFrame * 3;
+      const [lx, ly, lz] = camToThree(hammerData[offL], hammerData[offL + 1], hammerData[offL + 2]);
+      orbitExtremes.push({ frame: minFrame, pos: [lx, ly, lz], type: 'low', turnFrameCount });
+    }
+  }
+}
+
+function createOrbitExtremesSpheres() {
+  orbitExtremesGroup = new THREE.Group();
+  orbitExtremesGroup.visible = false;  // off until toggled
+
+  for (const ext of orbitExtremes) {
+    const geo = new THREE.SphereGeometry(0.08, 16, 16);
+    const isHigh = ext.type === 'high';
+    const mat = new THREE.MeshStandardMaterial({
+      color: isHigh ? 0xff4444 : 0x44aaff,
+      emissive: isHigh ? 0xcc2222 : 0x2288cc,
+      emissiveIntensity: 0.3,
+      roughness: 0.3,
+      metalness: 0.4,
+      transparent: true,
+      opacity: 0,
+    });
+    const sphere = new THREE.Mesh(geo, mat);
+    sphere.position.set(ext.pos[0], ext.pos[1], ext.pos[2]);
+    sphere.visible = false;
+    ext.sphere = sphere;
+    orbitExtremesGroup.add(sphere);
+  }
+
+  scene.add(orbitExtremesGroup);
+}
+
+function updateOrbitExtremesFrame(frame) {
+  if (!orbitExtremesGroup || !orbitExtremesGroup.visible) return;
+
+  for (const ext of orbitExtremes) {
+    if (!ext.sphere) continue;
+    if (frame < ext.frame) {
+      ext.sphere.visible = false;
+    } else {
+      const elapsed = frame - ext.frame;
+      const fadeDuration = Math.round(0.75 * ext.turnFrameCount);
+      ext.sphere.visible = true;
+      if (fadeDuration <= 0 || elapsed > fadeDuration) {
+        ext.sphere.material.opacity = 0.5;
+      } else {
+        ext.sphere.material.opacity = 1.0 - 0.5 * (elapsed / fadeDuration);
+      }
+    }
   }
 }
 
@@ -584,9 +708,8 @@ function drawLegCorotationGraph(frame) {
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, w, h);
 
-  const tw = metadata.throw_window || {};
-  const fStart = tw.start || 0;
-  const fEnd = tw.release || (legAlignmentData.length - 1);
+  const fStart = timelineMin;
+  const fEnd = timelineMax;
 
   const pad = { left: 40, right: 10, top: 22, bottom: 22 };
   const plotW = w - pad.left - pad.right;
@@ -695,17 +818,25 @@ function computeBackTiltAngle(frame) {
   const torsoDir = new THREE.Vector3().subVectors(shoulderMid, hipMid).normalize();
   const up = new THREE.Vector3(0, 1, 0);
   const dot = Math.min(1, Math.max(-1, torsoDir.dot(up)));
-  const tiltRad = Math.acos(Math.abs(dot));
+  const tiltRad = Math.acos(dot);  // 0 = vertical, π/2 = horizontal
 
-  // Sign: positive = leaning back, negative = leaning forward
-  const nose = getKp(frame, 0);
-  const torsoCenter = shoulderMid.clone().add(hipMid).multiplyScalar(0.5);
-  const forwardDir = new THREE.Vector3().subVectors(nose, torsoCenter);
-  forwardDir.y = 0;
-  forwardDir.normalize();
+  // Sign: positive = leaning AWAY from hammer (back lean)
   const shoulderDisp = new THREE.Vector3().subVectors(shoulderMid, hipMid);
   shoulderDisp.y = 0;
-  const sign = shoulderDisp.dot(forwardDir) > 0 ? -1 : 1;
+
+  const hOff = frame * 3;
+  const hammerValid = hammerData && !isNaN(hammerData[hOff]) &&
+    !(hammerData[hOff] === 0 && hammerData[hOff + 1] === 0 && hammerData[hOff + 2] === 0);
+
+  let sign = 1;
+  if (hammerValid) {
+    const [hx, hy, hz] = camToThree(hammerData[hOff], hammerData[hOff + 1], hammerData[hOff + 2]);
+    const hammerDir = new THREE.Vector3(hx - hipMid.x, 0, hz - hipMid.z);
+    if (hammerDir.lengthSq() > 0.001) {
+      hammerDir.normalize();
+      sign = shoulderDisp.dot(hammerDir) < 0 ? 1 : -1;
+    }
+  }
 
   return sign * tiltRad * (180 / Math.PI);
 }
@@ -799,9 +930,8 @@ function drawBackTiltGraph(frame) {
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, w, h);
 
-  const tw = metadata.throw_window || {};
-  const fStart = tw.start || 0;
-  const fEnd = tw.release || (backTiltAngles.length - 1);
+  const fStart = timelineMin;
+  const fEnd = timelineMax;
 
   const pad = { left: 40, right: 10, top: 22, bottom: 22 };
   const plotW = w - pad.left - pad.right;
@@ -988,7 +1118,7 @@ function precomputeSeparation() {
   }
 }
 
-const SKIN_R = 0.831, SKIN_G = 0.647, SKIN_B = 0.455;
+const SKIN_R = 0.2, SKIN_G = 0.4, SKIN_B = 0.8;
 const GREEN_R = 0.2, GREEN_G = 1.0, GREEN_B = 0.2;
 const RED_R = 1.0, RED_G = 0.2, RED_B = 0.2;
 
@@ -1074,9 +1204,8 @@ function drawSeparationGraph(frame) {
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, w, h);
 
-  const tw = metadata.throw_window || {};
-  const fStart = tw.start || 0;
-  const fEnd = tw.release || (separationAngles.length - 1);
+  const fStart = timelineMin;
+  const fEnd = timelineMax;
 
   const pad = { left: 40, right: 10, top: 22, bottom: 22 };
   const plotW = w - pad.left - pad.right;
@@ -1223,6 +1352,71 @@ function updateCircleFrame(frame) {
   const cy = circlePositionsData[off + 1];
   const cz = circlePositionsData[off + 2];
   circleLine.position.set(cx, -cy, -cz);
+}
+
+// ─── Circle Degree Labels ────────────────────────────────────────────────────
+
+function createCircleLabels() {
+  if (!circleGroup || !circleLine) return;
+  if (!metadata.circle || !metadata.circle.detected) return;
+
+  const radius = metadata.circle.radius;
+  const center = circleLine.position;
+
+  // "Toward camera" direction projected onto ground plane (XZ)
+  let towardCam;
+  if (isWorldSpace) {
+    const cp = metadata.camera_position;
+    const cc = metadata.circle.center || [0, 0, 0];
+    towardCam = new THREE.Vector3(cp[0] - cc[0], 0, cp[2] - cc[2]).normalize();
+  } else {
+    towardCam = new THREE.Vector3(-center.x, 0, -center.z).normalize();
+  }
+
+  const up = new THREE.Vector3(0, 1, 0);
+  const rightDir = new THREE.Vector3().crossVectors(up, towardCam).normalize();
+
+  const labels = [
+    { text: '0\u00B0',   dir: towardCam },
+    { text: '90\u00B0',  dir: rightDir },
+    { text: '180\u00B0', dir: towardCam.clone().negate() },
+    { text: '270\u00B0', dir: rightDir.clone().negate() },
+  ];
+
+  const labelLen = 0.9;
+  const gap = 0.05;
+  const labelOffset = radius + gap + labelLen / 2;
+
+  const camYAngle = Math.atan2(towardCam.x, towardCam.z);
+
+  for (const { text, dir } of labels) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 48;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, 128, 48);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 40px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 64, 24);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const geo = new THREE.PlaneGeometry(labelLen, labelLen * 48 / 128);
+    const mat = new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+
+    mesh.position.set(dir.x * labelOffset, 0.005, dir.z * labelOffset);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.rotation.z = camYAngle;
+
+    circleLine.add(mesh);
+  }
 }
 
 // ─── Poles ───────────────────────────────────────────────────────────────────
@@ -1477,20 +1671,20 @@ function rebuildMarkers() {
 // ─── Graph Overlay System ─────────────────────────────────────────────────────
 
 let graphOverlayActive = false;
+let activeOverlaySource = null;  // 'planes' or 'separation'
 
-function showGraphOverlay(containerId, drawFn) {
+function showGraphOverlay(containerId, drawFn, source) {
   const isMobile = window.innerWidth <= 768 || window.innerHeight <= 500;
   const metricGraphs = document.getElementById('metric-graphs');
   const container = document.getElementById(containerId);
   if (!container) return;
 
   graphOverlayActive = true;
+  activeOverlaySource = source || null;
   container.style.display = 'block';
 
   if (isMobile) {
-    // Mobile: centered overlay, no backdrop, timeline stays interactive
     metricGraphs.classList.add('overlay-mode');
-    // Resize canvas buffer to match CSS display size (one frame delay for layout)
     requestAnimationFrame(() => {
       const canvas = container.querySelector('canvas');
       if (canvas) {
@@ -1501,32 +1695,35 @@ function showGraphOverlay(containerId, drawFn) {
       drawFn(currentFrame);
     });
   } else {
-    // Desktop: show in normal left-side position
     drawFn(currentFrame);
   }
 }
 
 function dismissGraphOverlay() {
   const metricGraphs = document.getElementById('metric-graphs');
-  const kaContainer = document.getElementById('kneeangle-container');
-
   graphOverlayActive = false;
   metricGraphs.classList.remove('overlay-mode');
 
-  // Hide the graph container
-  if (kaContainer) kaContainer.style.display = 'none';
-
-  // Reset canvas size to default
-  const canvas = document.getElementById('kneeangle-graph');
-  if (canvas) {
-    canvas.width = 360;
-    canvas.height = 140;
+  if (activeOverlaySource === 'planes') {
+    const kaContainer = document.getElementById('kneeangle-container');
+    if (kaContainer) kaContainer.style.display = 'none';
+    const canvas = document.getElementById('kneeangle-graph');
+    if (canvas) { canvas.width = 360; canvas.height = 140; }
+    if (legPlanesGroup) legPlanesGroup.visible = false;
+    const planesBtn = document.querySelector('.toggle-btn[data-target="planes"]');
+    if (planesBtn) planesBtn.classList.remove('active');
+  } else if (activeOverlaySource === 'separation') {
+    const sepContainer = document.getElementById('separation-container');
+    if (sepContainer) sepContainer.style.display = 'none';
+    const canvas = document.getElementById('separation-graph');
+    if (canvas) { canvas.width = 360; canvas.height = 140; }
+    separationEnabled = false;
+    updateTorsoColors(currentFrame);
+    const sepBtn = document.querySelector('.toggle-btn[data-target="separation"]');
+    if (sepBtn) sepBtn.classList.remove('active');
   }
 
-  // Also hide leg planes and deactivate button
-  if (legPlanesGroup) legPlanesGroup.visible = false;
-  const planesBtn = document.querySelector('.toggle-btn[data-target="planes"]');
-  if (planesBtn) planesBtn.classList.remove('active');
+  activeOverlaySource = null;
 }
 
 function cleanThrowName(raw) {
@@ -1578,6 +1775,13 @@ function initUI() {
       btn.classList.add('active');
       activeRangePreset = btn.dataset.range;
       applyTimelineRange();
+      // Redraw any visible graphs with new range
+      const sepC = document.getElementById('separation-container');
+      if (sepC && sepC.style.display !== 'none' && separationAngles) drawSeparationGraph(currentFrame);
+      const btC = document.getElementById('backtilt-container');
+      if (btC && btC.style.display !== 'none' && backTiltAngles) drawBackTiltGraph(currentFrame);
+      const kaC = document.getElementById('kneeangle-container');
+      if (kaC && kaC.style.display !== 'none' && legAlignmentData) drawLegCorotationGraph(currentFrame);
     });
   });
 
@@ -1668,7 +1872,7 @@ function initUI() {
         updateOneLegPlane(currentFrame, rightLegPlane, KP_RIGHT_HIP, KP_RIGHT_KNEE, KP_RIGHT_ANKLE);
         // After 1s flash, show graph overlay
         setTimeout(() => {
-          showGraphOverlay('kneeangle-container', drawLegCorotationGraph);
+          showGraphOverlay('kneeangle-container', drawLegCorotationGraph, 'planes');
         }, 1000);
       }, 500);
     };
@@ -1701,6 +1905,48 @@ function initUI() {
     planesBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); });
   }
 
+  // Separation button — tap/hold like Leg Planes (mobile)
+  const sepBtn = document.querySelector('.toggle-btn[data-target="separation"]');
+  if (sepBtn) {
+    let sepHoldTimer = null;
+    let sepIsHold = false;
+
+    const onSepDown = (e) => {
+      e.preventDefault();
+      sepIsHold = false;
+      sepHoldTimer = setTimeout(() => {
+        sepIsHold = true;
+        sepBtn.classList.add('active');
+        separationEnabled = true;
+        updateTorsoColors(currentFrame);
+        setTimeout(() => {
+          showGraphOverlay('separation-container', drawSeparationGraph, 'separation');
+        }, 1000);
+      }, 500);
+    };
+
+    const onSepUp = (e) => {
+      clearTimeout(sepHoldTimer);
+      if (!sepIsHold) {
+        if (graphOverlayActive && activeOverlaySource === 'separation') {
+          dismissGraphOverlay();
+        } else {
+          sepBtn.classList.toggle('active');
+          const visible = sepBtn.classList.contains('active');
+          separationEnabled = visible;
+          updateTorsoColors(currentFrame);
+        }
+      }
+    };
+
+    sepBtn.addEventListener('pointerdown', onSepDown);
+    sepBtn.addEventListener('pointerup', onSepUp);
+    sepBtn.addEventListener('pointercancel', () => clearTimeout(sepHoldTimer));
+    sepBtn.addEventListener('contextmenu', (e) => e.preventDefault());
+    sepBtn.addEventListener('selectstart', (e) => e.preventDefault());
+    sepBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); });
+  }
+
   // Tap on graph container dismisses overlay
   const kneeContainer = document.getElementById('kneeangle-container');
   if (kneeContainer) {
@@ -1708,11 +1954,17 @@ function initUI() {
       if (graphOverlayActive) dismissGraphOverlay();
     });
   }
+  const sepContainer = document.getElementById('separation-container');
+  if (sepContainer) {
+    sepContainer.addEventListener('click', () => {
+      if (graphOverlayActive) dismissGraphOverlay();
+    });
+  }
 
-  // Other visibility toggles (backtilt, separation, circle)
+  // Other visibility toggles (backtilt, circle, maxmin)
   document.querySelectorAll('.toggle-btn').forEach(btn => {
     const target = btn.dataset.target;
-    if (target === 'planes') return;  // handled above
+    if (target === 'planes' || target === 'separation') return;  // handled above
     btn.addEventListener('click', () => {
       btn.classList.toggle('active');
       const visible = btn.classList.contains('active');
@@ -1722,12 +1974,9 @@ function initUI() {
         if (btContainer) btContainer.style.display = visible ? 'block' : 'none';
         if (visible) updateBackPlane(currentFrame);
       }
-      if (target === 'separation') {
-        separationEnabled = visible;
-        const sepContainer = document.getElementById('separation-container');
-        if (sepContainer) sepContainer.style.display = visible ? 'block' : 'none';
-        updateTorsoColors(currentFrame);
-        if (visible) drawSeparationGraph(currentFrame);
+      if (target === 'maxmin' && orbitExtremesGroup) {
+        orbitExtremesGroup.visible = visible;
+        if (visible) updateOrbitExtremesFrame(currentFrame);
       }
       if (target === 'circle' && circleGroup) circleGroup.visible = visible;
     });
@@ -1744,6 +1993,7 @@ function setFrame(f) {
 function updateFrame(frame) {
   updateMeshFrame(frame);
   updateHammerFrame(frame);
+  updateOrbitExtremesFrame(frame);
   updateLegPlanes(frame);
   updateBackPlane(frame);
   updateTorsoColors(frame);
@@ -1841,6 +2091,9 @@ async function main() {
   createBackPlane();
   precomputeSeparation();
   createCircle();
+  createCircleLabels();
+  precomputeOrbitExtremes();
+  createOrbitExtremesSpheres();
 
   // Set initial frame — positionGround first so groundY is available
   positionGround(0);
