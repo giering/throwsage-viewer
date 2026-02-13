@@ -22,6 +22,13 @@ let renderer, scene, camera, controls;
 let bodyMesh, hammerSphere, groundGroup;
 let leftLegPlane, rightLegPlane, legPlanesGroup;
 let circleGroup, circleLine;
+let circleLabelsGroup = null;
+let labelZeroMesh = null;
+let isDraggingLabel = false;
+let labelDragStartAngle = 0;
+let labelDragStartRotation = 0;
+const labelRaycaster = new THREE.Raycaster();
+const labelGroundPlane = new THREE.Plane();
 let backPlanesGroup, backPlane;
 let circlePositionsData = null;  // Float32Array (T * 3) — per-frame circle center (camera space)
 let poleGroup;  // kept for legacy data compat — no longer rendered
@@ -1379,6 +1386,7 @@ function updateCircleFrame(frame) {
   const cy = circlePositionsData[off + 1];
   const cz = circlePositionsData[off + 2];
   circleLine.position.set(cx, -cy, -cz);
+  if (circleLabelsGroup) circleLabelsGroup.position.set(cx, -cy, -cz);
 }
 
 // ─── Circle Degree Labels ────────────────────────────────────────────────────
@@ -1404,10 +1412,10 @@ function createCircleLabels() {
   const rightDir = new THREE.Vector3().crossVectors(up, towardCam).normalize();
 
   const labels = [
-    { text: '0\u00B0',   dir: towardCam },
-    { text: '90\u00B0',  dir: rightDir },
-    { text: '180\u00B0', dir: towardCam.clone().negate() },
-    { text: '270\u00B0', dir: rightDir.clone().negate() },
+    { text: '0\u00B0',   dir: towardCam,                   isZero: true },
+    { text: '90\u00B0',  dir: rightDir,                     isZero: false },
+    { text: '180\u00B0', dir: towardCam.clone().negate(),    isZero: false },
+    { text: '270\u00B0', dir: rightDir.clone().negate(),     isZero: false },
   ];
 
   const labelLen = 0.9;
@@ -1416,7 +1424,11 @@ function createCircleLabels() {
 
   const camYAngle = Math.atan2(towardCam.x, towardCam.z);
 
-  for (const { text, dir } of labels) {
+  // Separate group for labels — rotatable independently of the ring
+  circleLabelsGroup = new THREE.Group();
+  circleLabelsGroup.position.copy(center);
+
+  for (const { text, dir, isZero } of labels) {
     const canvas = document.createElement('canvas');
     canvas.width = 128;
     canvas.height = 48;
@@ -1442,8 +1454,101 @@ function createCircleLabels() {
     mesh.rotation.x = -Math.PI / 2;
     mesh.rotation.z = camYAngle;
 
-    circleLine.add(mesh);
+    circleLabelsGroup.add(mesh);
+
+    if (isZero) labelZeroMesh = mesh;
   }
+
+  circleGroup.add(circleLabelsGroup);
+}
+
+// ─── Label Drag Interaction ──────────────────────────────────────────────────
+
+function setupLabelDrag() {
+  if (!circleLabelsGroup || !labelZeroMesh) return;
+
+  const domEl = renderer.domElement;
+  const pointerNDC = new THREE.Vector2();
+  const intersectPoint = new THREE.Vector3();
+
+  function updateGroundPlane() {
+    // Horizontal plane at the label group's world Y
+    const worldPos = new THREE.Vector3();
+    circleLabelsGroup.getWorldPosition(worldPos);
+    labelGroundPlane.set(new THREE.Vector3(0, 1, 0), -worldPos.y);
+  }
+
+  function getNDC(event) {
+    const rect = domEl.getBoundingClientRect();
+    pointerNDC.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    pointerNDC.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  }
+
+  function getGroundPoint(event) {
+    getNDC(event);
+    labelRaycaster.setFromCamera(pointerNDC, camera);
+    const hit = labelRaycaster.ray.intersectPlane(labelGroundPlane, intersectPoint);
+    return hit;
+  }
+
+  domEl.addEventListener('pointerdown', (event) => {
+    if (!circleLabelsGroup) return;
+
+    getNDC(event);
+    labelRaycaster.setFromCamera(pointerNDC, camera);
+    const hits = labelRaycaster.intersectObjects(circleLabelsGroup.children);
+
+    // Only the 0° label initiates drag
+    if (hits.length > 0 && hits[0].object === labelZeroMesh) {
+      isDraggingLabel = true;
+
+      updateGroundPlane();
+      const gp = getGroundPoint(event);
+      if (!gp) { isDraggingLabel = false; return; }
+
+      const center = new THREE.Vector3();
+      circleLabelsGroup.getWorldPosition(center);
+      labelDragStartAngle = Math.atan2(gp.x - center.x, gp.z - center.z);
+      labelDragStartRotation = circleLabelsGroup.rotation.y;
+
+      controls.enabled = false;
+      domEl.style.cursor = 'grabbing';
+    }
+  });
+
+  domEl.addEventListener('pointermove', (event) => {
+    if (isDraggingLabel) {
+      const gp = getGroundPoint(event);
+      if (!gp) return;
+
+      const center = new THREE.Vector3();
+      circleLabelsGroup.getWorldPosition(center);
+      const currentAngle = Math.atan2(gp.x - center.x, gp.z - center.z);
+      circleLabelsGroup.rotation.y = labelDragStartRotation + (currentAngle - labelDragStartAngle);
+      return;
+    }
+
+    // Hover feedback: show grab cursor over 0° label
+    if (!circleLabelsGroup) return;
+    getNDC(event);
+    labelRaycaster.setFromCamera(pointerNDC, camera);
+    const hits = labelRaycaster.intersectObjects(circleLabelsGroup.children);
+    if (hits.length > 0 && hits[0].object === labelZeroMesh) {
+      domEl.style.cursor = 'grab';
+    } else if (domEl.style.cursor === 'grab') {
+      domEl.style.cursor = '';
+    }
+  });
+
+  const endDrag = () => {
+    if (!isDraggingLabel) return;
+    isDraggingLabel = false;
+    controls.enabled = true;
+    domEl.style.cursor = '';
+  };
+
+  domEl.addEventListener('pointerup', endDrag);
+  domEl.addEventListener('pointercancel', endDrag);
 }
 
 // ─── Poles ───────────────────────────────────────────────────────────────────
@@ -2119,6 +2224,7 @@ async function main() {
   precomputeSeparation();
   createCircle();
   createCircleLabels();
+  setupLabelDrag();
   precomputeOrbitExtremes();
   createOrbitExtremesSpheres();
 
