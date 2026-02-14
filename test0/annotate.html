@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>ThrowSage Annotate</title>
+  <link rel="stylesheet" href="annotate-style.css">
+</head>
+<body>
+
+  <!-- Loading overlay -->
+  <div id="loading">
+    <div class="spinner"></div>
+    <div class="label" id="loading-label">Loading video...</div>
+    <div id="loading-progress">
+      <div id="loading-bar"></div>
+    </div>
+    <div class="label" id="loading-bytes"></div>
+  </div>
+
+  <!-- Header -->
+  <div id="header">
+    <span class="app-name">ThrowSage Annotate</span>
+    <span class="throw-name" id="throw-name"></span>
+    <span class="frame-info" id="frame-info">Frame 0 / 0</span>
+    <span class="tag-summary" id="tag-summary">No tags</span>
+  </div>
+
+  <!-- Mode tabs -->
+  <div id="mode-tabs">
+    <button class="mode-tab active" data-mode="circle">Circle</button>
+    <button class="mode-tab" data-mode="tags">Tags</button>
+    <button class="mode-tab" data-mode="ball">Ball</button>
+  </div>
+
+  <!-- Main display area -->
+  <div id="display-area">
+    <video id="video-source" preload="auto" muted playsinline></video>
+    <canvas id="frame-canvas"></canvas>
+  </div>
+
+  <!-- Timeline -->
+  <div id="timeline">
+    <div id="timeline-controls">
+      <button id="step-back-btn" class="nav-btn" title="Back 1 frame">&#9664;</button>
+      <button id="play-btn" class="nav-btn" title="Play/Pause">&#9654;</button>
+      <button id="step-fwd-btn" class="nav-btn" title="Forward 1 frame">&#9654;</button>
+      <div id="speed-group">
+        <button class="speed-btn" data-speed="0.25">0.25x</button>
+        <button class="speed-btn" data-speed="0.5">0.5x</button>
+        <button class="speed-btn active" data-speed="1">1x</button>
+        <button class="speed-btn" data-speed="2">2x</button>
+      </div>
+      <div id="range-group">
+        <button class="range-btn active" data-range="all">All</button>
+        <button class="range-btn" data-range="wind">Wind</button>
+        <button class="range-btn" data-range="throw">Throw</button>
+      </div>
+      <div id="scrubber-container">
+        <input type="range" id="scrubber" min="0" max="0" value="0" step="1">
+        <div id="auto-markers"></div>
+        <div id="manual-markers"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mode-specific toolbars -->
+  <div id="toolbar-circle" class="mode-toolbar active">
+    <div class="toolbar-row">
+      <button id="btn-place-circle" class="tool-btn tool-circle">Place</button>
+      <button id="btn-define-circle" class="tool-btn tool-circle">Click-5 pts</button>
+      <button id="btn-accept-circle" class="tool-btn tool-save" disabled>Save</button>
+      <button id="btn-reset-circle" class="tool-btn tool-action">Reset</button>
+    </div>
+    <div class="toolbar-row" id="define-info" style="display:none">
+      <span class="toolbar-info" id="define-count">Click circle edge: 0/5 points</span>
+    </div>
+  </div>
+
+  <div id="toolbar-tags" class="mode-toolbar">
+    <div class="toolbar-row">
+      <button id="tag-t0-btn" class="tool-btn tag-t0">T0</button>
+      <button id="tag-release-btn" class="tool-btn tag-release">Release</button>
+      <button id="tag-turn-btn" class="tool-btn tag-turn">Turn</button>
+      <button id="tag-ss-btn" class="tool-btn tag-ss">SS</button>
+      <button id="tag-ds-btn" class="tool-btn tag-ds">DS</button>
+    </div>
+    <div class="toolbar-row">
+      <button id="tag-undo-btn" class="tool-btn tool-action">Undo</button>
+      <button id="tag-delete-btn" class="tool-btn tool-action">Delete</button>
+      <button id="btn-show-auto" class="tool-btn tool-toggle">Show Auto</button>
+      <button id="tag-save-btn" class="tool-btn tool-save">Save</button>
+    </div>
+  </div>
+
+  <div id="toolbar-ball" class="mode-toolbar">
+    <div class="toolbar-row">
+      <button id="btn-mark-ball" class="tool-btn tool-ball">Mark Ball</button>
+      <span id="ball-count" class="toolbar-info">0 marks</span>
+      <button id="btn-show-tracked" class="tool-btn tool-toggle" style="display:none">Show Tracked</button>
+      <button id="btn-save-ball" class="tool-btn tool-save">Save</button>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div id="toast-container"></div>
+
+  <script type="module" src="annotate.js"></script>
+</body>
+</html>
