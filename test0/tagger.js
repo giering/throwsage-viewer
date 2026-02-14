@@ -382,13 +382,16 @@ export async function load() {
 
 // ─── Manual Markers on Timeline ──────────────────────────────────────────────
 
-export function renderManualMarkers(container, onClickFrame) {
+export function renderManualMarkers(container, onClickFrame, rangeMin, rangeMax) {
   container.innerHTML = '';
-  const T = _totalFrames;
-  if (T <= 1) return;
+  const rMin = rangeMin !== undefined ? rangeMin : 0;
+  const rMax = rangeMax !== undefined ? rangeMax : _totalFrames - 1;
+  const span = rMax - rMin;
+  if (span <= 0) return;
 
   function addMarker(frame, label, className) {
-    const pct = (frame / (T - 1)) * 100;
+    if (frame < rMin || frame > rMax) return;
+    const pct = ((frame - rMin) / span) * 100;
     const el = document.createElement('div');
     el.className = `manual-marker ${className}`;
     el.style.left = pct + '%';
