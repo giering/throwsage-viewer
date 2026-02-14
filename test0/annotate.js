@@ -994,12 +994,24 @@ function initSpeedButtons() {
 
 let activeRange = 'all';
 
+function getEffectiveT0() {
+  // Prefer manual tag, fall back to metadata
+  if (tagger.throwStart !== null) return tagger.throwStart;
+  if (metadata && metadata.throw_window && metadata.throw_window.start > 0) return metadata.throw_window.start;
+  return null;
+}
+
+function getEffectiveRelease() {
+  if (tagger.release !== null) return tagger.release;
+  if (metadata && metadata.throw_window && metadata.throw_window.release > 0) return metadata.throw_window.release;
+  return null;
+}
+
 function getVideoEndFrame() {
-  // Highpoint from metadata if available, else release + 1 second, else total frames
   if (metadata && metadata.hammer_highpoint_frame) {
     return metadata.hammer_highpoint_frame;
   }
-  const rel = tagger.release;
+  const rel = getEffectiveRelease();
   if (rel !== null) {
     return Math.min(rel + Math.round(fps), totalFrames - 1);
   }
@@ -1007,8 +1019,7 @@ function getVideoEndFrame() {
 }
 
 function getTimelineRange() {
-  const t0 = tagger.throwStart;
-  const rel = tagger.release;
+  const t0 = getEffectiveT0();
   const endFrame = getVideoEndFrame();
   if (activeRange === 'wind' && t0 !== null) {
     return { min: 0, max: t0 };
